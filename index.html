@@ -24,6 +24,37 @@
       // |      START OF AI SECTION      |
       // |-------------------------------|
 
+      function averageHSL(colors) {
+        let sumX = 0;
+        let sumY = 0;
+        let sumS = 0;
+        let sumL = 0;
+
+        for (const { h, s, l } of colors) {
+          const rad = (h * Math.PI) / 180;
+          sumX += Math.cos(rad);
+          sumY += Math.sin(rad);
+          sumS += s;
+          sumL += l;
+        }
+
+        const count = colors.length;
+        const avgX = sumX / count;
+        const avgY = sumY / count;
+
+        // Convert averaged vector back to degrees
+        let avgH = (Math.atan2(avgY, avgX) * 180) / Math.PI;
+        if (avgH < 0) {
+          avgH += 360;
+        }
+
+        return {
+          h: avgH,
+          s: sumS / count,
+          l: sumL / count,
+        };
+      }
+
       // Returns a float in [0, 1), like Math.random(), but seeded
       function next() {
         state = (state + 0x6d2b79f5) >>> 0;
@@ -52,7 +83,7 @@
       function getTile(x, y) {
         // written by AI
 
-        return inBounds(x, y) ? map[y][x] : null; // null = outside the world
+        return inBounds(x, y) ? (map?.[y]?.[x] ?? null) : null; // null = outside the world
       }
 
       function setTile(x, y, id) {
@@ -166,7 +197,7 @@
           this.color = {
             h: color.h,
             s: color.s,
-            l: Math.max(0, Math.min(100, color.l + Math.round(hash(x, y) * 20) - 10)),
+            l: color.l, //Math.max(0, Math.min(100, color.l + Math.round(hash(x, y) * 20) - 10)),
           };
         }
       }
@@ -175,15 +206,11 @@
         return "grass";
       }
 
-      const map = [];
-      for (let y = 0; y < yCellCount; y++) {
-        const row = [];
-        for (let x = 0; x < xCellCount; x++) {
-          const color = { h: random(0, 360), s: 100, l: 50 };
-          row.push(new Cell(x, y, getCellType(), color));
-        }
-        map.push(row);
+      function randomHsl() {
+        return { h: random(0, 360), s: 100, l: random(40, 60) };
       }
+
+      const map = Array.from({ length: yCellCount }, () => Array.from({ length: xCellCount }, () => {}));
 
       function render() {
         rect(0, 0, 100000, 100000);
@@ -201,7 +228,7 @@
 
       function loop() {
         render();
-        //requestAnimationFrame(loop);
+        requestAnimationFrame(loop);
       }
 
       requestAnimationFrame(loop);
