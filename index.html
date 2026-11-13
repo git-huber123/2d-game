@@ -180,6 +180,9 @@
       const xCellCount = 100;
       const yCellCount = 100;
 
+      let cameraX = 50;
+      let cameraY = 50;
+
       const player = { x: 50, y: 50, health: 10 };
       const cameraWidth = width / cellSize;
       const cameraHeight = height / cellSize;
@@ -190,35 +193,93 @@
       console.log("Seed:", seed);
 
       class Cell {
-        constructor(x, y, type, color) {
+        constructor(x, y, type, color = null) {
+          if (color === null) color = getColor(type);
           this.x = x;
           this.y = y;
           this.type = type;
-          this.color = {
-            h: color.h,
-            s: color.s,
-            l: color.l, //Math.max(0, Math.min(100, color.l + Math.round(hash(x, y) * 20) - 10)),
-          };
+          this.color = color;
+        }
+        collision() {
+          return ["wall"].includes(this.type);
         }
       }
 
-      function getCellType() {
-        return "grass";
+      function getColor(type) {
+        switch (type) {
+          case "wall":
+            return { h: random(0, 10) + 20, s: random(0, 20) + 20, l: random(0, 10) + 15 };
+          case "grass":
+            return { h: random(0, 25) + 95, s: random(0, 25) + 40, l: random(0, 18) + 20 };
+        }
       }
 
       function randomHsl() {
         return { h: random(0, 360), s: 100, l: random(40, 60) };
       }
 
-      const map = Array.from({ length: yCellCount }, () => Array.from({ length: xCellCount }, () => {}));
+      const map = [];
+      map.push(Array.from({ length: xCellCount }, (_, x) => new Cell(x, 0, "wall")));
+
+      for (let y = 0; y < yCellCount - 2; y++) {
+        const row = [new Cell(0, y, "wall")];
+        for (let x = 0; x < xCellCount - 2; x++) {
+          row.push(new Cell(x, y, "grass"));
+        }
+        row.push(new Cell(xCellCount - 1, y, "wall"));
+        map.push(row);
+      }
+      map.push(Array.from({ length: xCellCount }, (_, x) => new Cell(x, yCellCount - 1, "wall")));
+
+      const keys = {};
+
+      window.addEventListener("keydown", (event) => {
+        keys[event.key.toLowerCase()] = true;
+      });
+
+      window.addEventListener("keyup", (event) => {
+        keys[event.key.toLowerCase()] = false;
+      });
+
+      let playerMoved = false;
+      lastMove = performance.now();
+
+      function handleMovement() {
+        if (performance.now() - lastMove < 50) return;
+        if (!playerMoved) {
+          if (keys.w && player.y > 0 && !getTile(player.y - 1, player.x).collision()) {
+            playerMoved = true;
+            player.y -= 1;
+            lastMove = performance.now();
+          }
+          if (keys.s && player.y < yCellCount - 1 && !getTile(player.y + 1, player.x).collision()) {
+            playerMoved = true;
+            player.y += 1;
+            lastMove = performance.now();
+          }
+          if (keys.a && player.x > 0 && !getTile(player.y, player.x - 1).collision()) {
+            playerMoved = true;
+            player.x -= 1;
+            lastMove = performance.now();
+          }
+          if (keys.d && player.x < xCellCount - 1 && !getTile(player.y, player.x + 1).collision()) {
+            playerMoved = true;
+            player.x += 1;
+            lastMove = performance.now();
+          }
+        }
+      }
 
       function render() {
         rect(0, 0, 100000, 100000);
         for (let x = 0; x < cameraWidth; x++) {
           for (let y = 0; y < cameraHeight; y++) {
-            const cx = x + player.x - cameraWidth / 2;
-            const cy = y + player.y - cameraHeight / 2;
-
+            const cx = x + cameraX - cameraWidth / 2;
+            const cy = y + cameraY - cameraHeight / 2;
+            if (cx === player.x && cy === player.y) {
+              rect(x * cellSize, y * cellSize, cellSize, cellSize, "black");
+              continue;
+            }
             const color = hslToRgb(getTile(cx, cy).color);
             const rgb = `rgb(${color.r},${color.g},${color.b})`;
             rect(x * cellSize, y * cellSize, cellSize, cellSize, rgb);
@@ -227,6 +288,11 @@
       }
 
       function loop() {
+        // remove later
+        playerMoved = false;
+        handleMovement();
+        cameraX = Math.max(cameraWidth / 2, Math.min(xCellCount - cameraWidth / 2, player.x));
+        cameraY = Math.max(cameraHeight / 2, Math.min(yCellCount - cameraHeight / 2, player.y));
         render();
         requestAnimationFrame(loop);
       }
