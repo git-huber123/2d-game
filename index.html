@@ -261,7 +261,7 @@
       const enemies = [];
       const initialEnemyCount = random(5, 15);
       for (let i = 0; i < initialEnemyCount; i++) {
-        enemies.push(spawnEnemy());
+        spawnEnemy();
       }
 
       function enemyPathfind(enemy, px = player.x, py = player.y) {
@@ -319,24 +319,21 @@
       lastMove = performance.now();
 
       function handleMovement() {
-        if (performance.now() - lastMove < 50) return;
+        if (performance.now() - lastMove < 100) return;
         if (!playerMoved) {
           if (keys.w && player.y > 0 && !getTile(player.x, player.y - 1).collision()) {
             playerMoved = true;
             player.y -= 1;
             lastMove = performance.now();
-          }
-          if (keys.s && player.y < yCellCount - 1 && !getTile(player.x, player.y + 1).collision()) {
+          } else if (keys.s && player.y < yCellCount - 1 && !getTile(player.x, player.y + 1).collision()) {
             playerMoved = true;
             player.y += 1;
             lastMove = performance.now();
-          }
-          if (keys.a && player.x > 0 && !getTile(player.x - 1, player.y).collision()) {
+          } else if (keys.a && player.x > 0 && !getTile(player.x - 1, player.y).collision()) {
             playerMoved = true;
             player.x -= 1;
             lastMove = performance.now();
-          }
-          if (keys.d && player.x < xCellCount - 1 && !getTile(player.x + 1, player.y).collision()) {
+          } else if (keys.d && player.x < xCellCount - 1 && !getTile(player.x + 1, player.y).collision()) {
             playerMoved = true;
             player.x += 1;
             lastMove = performance.now();
