@@ -231,7 +231,22 @@
       }
       map.push(Array.from({ length: xCellCount }, (_, x) => new Cell(x, yCellCount - 1, "wall")));
 
-      const keys = {};
+      const enemies = []
+      const initialEnemyCount = random(5,15)
+      for (let i = 0; i < initialEnemyCount; i++) {
+        spawnEnemy()
+      }
+
+      function spawnEnemy(health=5, x=random(0, xCellCount), y=random(0, yCellCount), push=true) {
+        const enemy = {}
+        enemy.health = health;
+        enemy.x = x;
+        enemy.y = y
+        if (push) enemies.push(enemy)
+        return enemy;
+      }
+
+      const keys = {};  
 
       window.addEventListener("keydown", (event) => {
         keys[event.key.toLowerCase()] = true;
