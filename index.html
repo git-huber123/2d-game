@@ -208,9 +208,17 @@
       function getColor(type) {
         switch (type) {
           case "wall":
-            return { h: random(0, 10) + 20, s: random(0, 20) + 20, l: random(0, 10) + 15 };
+            return {
+              h: random(0, 10) + 20,
+              s: random(0, 20) + 20,
+              l: random(0, 10) + 15,
+            };
           case "grass":
-            return { h: random(0, 25) + 95, s: random(0, 25) + 40, l: random(0, 18) + 20 };
+            return {
+              h: random(0, 25) + 95,
+              s: random(0, 25) + 40,
+              l: random(0, 18) + 20,
+            };
         }
       }
 
@@ -231,22 +239,38 @@
       }
       map.push(Array.from({ length: xCellCount }, (_, x) => new Cell(x, yCellCount - 1, "wall")));
 
-      const enemies = []
-      const initialEnemyCount = random(5,15)
+      const enemies = [];
+      const initialEnemyCount = random(5, 15);
       for (let i = 0; i < initialEnemyCount; i++) {
-        spawnEnemy()
+        spawnEnemy();
       }
 
-      function spawnEnemy(health=5, x=random(0, xCellCount), y=random(0, yCellCount), push=true) {
-        const enemy = {}
+      function enemyPathfind(enemy, px = player.x, py = player.y) {
+        const possibleMoves = [];
+        if (enemy.y > 0 && !getTile(enemy.y - 1, enemy.x).collision()) {
+          possibleMoves.push({ x: 0, y: -1 });
+        }
+        if (enemy.y < yCellCount - 1 && !getTile(enemy.y + 1, enemy.x).collision()) {
+          possibleMoves.push({ x: 0, y: 1 });
+        }
+        if (enemy.x > 0 && !getTile(enemy.y, enemy.x - 1).collision()) {
+          possibleMoves.push({ x: -1, y: 0 });
+        }
+        if (enemy.x < xCellCount - 1 && !getTile(enemy.y, enemy.x + 1).collision()) {
+          possibleMoves.push({ x: 1, y: 0 });
+        }
+      }
+
+      function spawnEnemy(health = 5, x = random(0, xCellCount), y = random(0, yCellCount), push = true) {
+        const enemy = {};
         enemy.health = health;
         enemy.x = x;
-        enemy.y = y
-        if (push) enemies.push(enemy)
+        enemy.y = y;
+        if (push) enemies.push(enemy);
         return enemy;
       }
 
-      const keys = {};  
+      const keys = {};
 
       window.addEventListener("keydown", (event) => {
         keys[event.key.toLowerCase()] = true;
