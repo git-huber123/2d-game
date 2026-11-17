@@ -530,7 +530,7 @@
             if (nX >= 0 && nY >= 0 && nX <= xCellCount - 1 && nY <= yCellCount - 1 && bestDist > bfsMap[nY][nX].distance && !enemyMap[nY][nX]) {
               console.log(nX, nY, bfsMap[nY][nX]);
               bestDist = bfsMap[nY][nX].distance;
-              bestMove = { x: dX, y: dY };
+              bestMove = { x: dx, y: dy };
             }
           }
           enemy.x += bestMove.x;
