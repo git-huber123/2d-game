@@ -267,6 +267,8 @@
         fillRect(sx, sy, sx + width, sy + width, "wall");
       }
 
+      setTile(player.x, player.y, new Cell(player.x, player.y, "grass"));
+
       const enemies = [];
       const initialEnemyCount = random(5, 15);
       for (let i = 0; i < initialEnemyCount; i++) {
@@ -320,7 +322,7 @@
             edgeTiles.push({ x: cell.x + 1, y: cell.y, distance: cell.distance + 1, move: { x: -1, y: 0 } });
           }
         }
-        const bfsMap = Array.from({ length: yCellCount }, (_, y) => Array.from({ length: xCellCount }, (_, x) => ({ x: 0, y: 0, distance: 0 })));
+        const bfsMap = Array.from({ length: yCellCount }, (_, y) => Array.from({ length: xCellCount }, (_, x) => ({ x: 0, y: 0, distance: Infinity })));
         for (let item of Object.values(scannedTiles)) {
           bfsMap[item.y][item.x] = { x: item.move.x, y: item.move.y, distance: item.distance };
         }
@@ -361,7 +363,16 @@
         return enemy;
       }
 
-      function spawnEnemy(health = 5, x = random(0, xCellCount), y = random(0, yCellCount), push = true) {
+      function spawnEnemy(health = 5, x = random(1, xCellCount - 2), y = random(1, yCellCount - 2), push = true) {
+        let attempts = 0;
+        while (attempts < 100) {
+          if (map[y][x].collision()) {
+            x = random(1, xCellCount - 2);
+            y = random(1, yCellCount - 2);
+          } else {
+            attempts = 101;
+          }
+        }
         const enemy = {};
         enemy.id = crypto.randomUUID();
         enemy.health = health;
@@ -383,7 +394,7 @@
       });
 
       let playerMoved = false;
-      lastMove = performance.now();
+      let lastMove = performance.now();
 
       function handleMovement() {
         if (performance.now() - lastMove < 100) return;
@@ -429,7 +440,7 @@
 
       function playerPlaceBlock() {
         const spot = { x: player.x + facing.x, y: player.y + facing.y };
-        if (getTile(spot.x, spot.y).type === "grass") {
+        if (getTile(spot.x, spot.y).type === "grass" && !checkEnemyCollisions({ id: null, x: spot.x, y: spot.y })) {
           placeBlock(spot.x, spot.y, "wall");
         } else if (getTile(spot.x, spot.y).isBreakable()) {
           breakBlock(spot.x, spot.y);
@@ -503,13 +514,18 @@
             ]) {
               const e = enemyMap[enemy.y + dy][enemy.x + dx];
               const t = getTile(enemy.x + dx, enemy.y + dy);
-              if (!t.collision() && !e) possibleMoves.push({ x: dx, y: dy });
+              const nx = enemy.x + dx;
+              const ny = enemy.y + dy;
+              if (inBounds(nx, ny) && !getTile(nx, ny).collision() && !enemyMap[ny][nx]) {
+                possibleMoves.push({ x: dx, y: dy });
+              }
             }
             if (possibleMoves.length > 0) {
               const r = random(0, possibleMoves.length - 1);
               enemy.x += possibleMoves[r].x;
               enemy.y += possibleMoves[r].y;
             }
+            continue;
           }
           if (!enemyMap[enemy.y + move.y]?.[enemy.x + move.x]) {
             enemy.x += move.x;
@@ -527,7 +543,7 @@
             if (dx === move.x && dy === move.y) continue;
             const nX = enemy.x + dx;
             const nY = enemy.y + dy;
-            if (nX >= 0 && nY >= 0 && nX <= xCellCount - 1 && nY <= yCellCount - 1 && bestDist > bfsMap[nY][nX].distance && !enemyMap[nY][nX]) {
+            if (nX >= 0 && nY >= 0 && nX <= xCellCount - 1 && nY <= yCellCount - 1 && bestDist > bfsMap[nY][nX].distance && !enemyMap[nY][nX] && !map[nY][nX].collision()) {
               console.log(nX, nY, bfsMap[nY][nX]);
               bestDist = bfsMap[nY][nX].distance;
               bestMove = { x: dx, y: dy };
