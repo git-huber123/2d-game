@@ -4,26 +4,66 @@
     <title>Cool 2d Game</title>
     <meta name="viewport" />
     <style>
-      canvas {
+      #canvas {
         display: block;
         image-rendering: pixelated;
-        width: 90vw;
+        width: 80vw;
         height: auto;
         max-width: 90vw;
-        max-height: 90vh;
+        max-height: 80vh;
         aspect-ratio: 1920 / 1024;
         object-fit: contain;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
       }
     </style>
   </head>
   <body>
-    <canvas id="canvas" style="width: 90vw; height: 90vh"></canvas>
+    <canvas id="canvas" style="width: 90vw; height: 80vh"></canvas>
+    <canvas id="inventory" style="width: 90vw; height: 10vh"></canvas>
 
     <script>
       // test comment
       // |-------------------------------|
       // |      START OF AI SECTION      |
       // |-------------------------------|
+
+      function text(
+        text,
+        x,
+        y,
+        c = ctx,
+        {
+          color = "white",
+          font = "20px monospace",
+          align = "left", // "left", "center", or "right"
+          baseline = "top", // "top", "middle", "bottom", or "alphabetic"
+          strokeColor = null,
+          strokeWidth = 0,
+        } = {},
+      ) {
+        c.save(); // Saves current canvas settings so alignment changes don't affect other text
+        c.font = font;
+        c.textAlign = align;
+        c.textBaseline = baseline;
+
+        if (strokeWidth > 0 && strokeColor) {
+          c.lineWidth = strokeWidth;
+          c.strokeStyle = strokeColor;
+          c.strokeText(text, x, y);
+        }
+
+        if (color) {
+          c.fillStyle = color;
+          c.fillText(text, x, y);
+        }
+        c.restore();
+      }
 
       function averageHSL(colors) {
         let sumX = 0;
@@ -93,15 +133,15 @@
         if (inBounds(x, y)) map[y][x] = id;
       }
 
-      function rect(x, y, width, height, color = "black", strokeColor = "black", strokeWidth = 0) {
+      function rect(x, y, width, height, color = "black", strokeColor = "black", strokeWidth = 0, c = ctx) {
         // written by AI
-        ctx.fillStyle = color;
-        ctx.fillRect(x, y, width, height);
+        c.fillStyle = color;
+        c.fillRect(x, y, width, height);
 
         if (strokeWidth > 0) {
-          ctx.lineWidth = strokeWidth;
-          ctx.strokeStyle = strokeColor;
-          ctx.strokeRect(x, y, width, height);
+          c.lineWidth = strokeWidth;
+          c.strokeStyle = strokeColor;
+          c.strokeRect(x, y, width, height);
         }
       }
 
@@ -185,6 +225,9 @@
           }
         }
       }
+
+      let inventory = [];
+      let selectedItem = 0;
 
       let facing = { x: 0, y: -1 };
 
@@ -400,14 +443,14 @@
       function handleMovement() {
         if (performance.now() - lastMove < 100) return;
         if (!playerMoved) {
-          if (keys.w && player.y > 0) {
+          if (keys.w && player.y > 0 && !playerMoved) {
             facing = { x: 0, y: -1 };
             if (!getTile(player.x, player.y - 1)?.collision()) {
               playerMoved = true;
               player.y -= 1;
             }
             lastMove = performance.now();
-          } else if (keys.s && player.y < yCellCount - 1) {
+          } else if (keys.s && player.y < yCellCount - 1 && !playerMoved) {
             if (!getTile(player.x, player.y + 1)?.collision()) {
               playerMoved = true;
               player.y += 1;
@@ -415,7 +458,7 @@
 
             lastMove = performance.now();
             facing = { x: 0, y: 1 };
-          } else if (keys.a && player.x > 0) {
+          } else if (keys.a && player.x > 0 && !playerMoved) {
             if (!getTile(player.x - 1, player.y)?.collision()) {
               playerMoved = true;
               player.x -= 1;
@@ -423,7 +466,7 @@
 
             lastMove = performance.now();
             facing = { x: -1, y: 0 };
-          } else if (keys.d && player.x < xCellCount - 1) {
+          } else if (keys.d && player.x < xCellCount - 1 && !playerMoved) {
             if (!getTile(player.x + 1, player.y)?.collision()) {
               playerMoved = true;
               player.x += 1;
@@ -442,18 +485,43 @@
       function playerPlaceBlock() {
         const spot = { x: player.x + facing.x, y: player.y + facing.y };
         if (getTile(spot.x, spot.y).type === "grass" && !checkEnemyCollisions({ id: null, x: spot.x, y: spot.y })) {
-          placeBlock(spot.x, spot.y, "wall");
+          placeBlock(spot.x, spot.y);
         } else if (getTile(spot.x, spot.y).isBreakable()) {
           breakBlock(spot.x, spot.y);
         }
       }
 
       function placeBlock(x, y, type) {
-        setTile(x, y, new Cell(x, y, type));
+        const item = inventory[selectedItem];
+        if (!item) return;
+        if (inventory.length <= 0 && item.count <= 0 && !item.isPlaceable()) return;
+
+        inventory[selectedItem].count -= 1;
+        if (inventory[selectedItem].count === 0) inventory.splice(selectedItem, 1);
+        setTile(x, y, new Cell(x, y, item.blocktype));
       }
 
       function breakBlock(x, y) {
+        const type = getTile(x, y).type;
         setTile(x, y, new Cell(x, y, "grass"));
+        for (let item of inventory) {
+          if (item.type === "block" && item.blocktype === type) {
+            item.count += 1;
+            return;
+          }
+        }
+        inventory.push(new Item("block", 1, getColor("wall"), { blocktype: type }));
+      }
+
+      class Item {
+        constructor(itemType, count, color, info) {
+          this.type = itemType;
+          this.count = count;
+          this.color = color;
+          for (const [key, value] of Object.entries(info)) {
+            this[key] = value;
+          }
+        }
       }
 
       function render() {
@@ -555,6 +623,24 @@
         }
       }
 
+      function renderInventory() {
+        const c = document.getElementById("inventory");
+
+        c.width = width;
+        c.height = Math.floor(width / 8);
+        const w = width / 10;
+        const spacing = width / 100;
+        const tw = width + spacing;
+        rect(0, 0, 10000, 100000, "black", "black", 0, c.getContext("2d"));
+
+        for (let i = 0; i < inventory.length; i++) {
+          const rgb = hslToRgb(inventory[i].color);
+          const color = `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+          rect(spacing + tw * i, c.height / 5, w - spacing, (c.height * 3) / 5, color, "black", i === selectedItem ? 8 : 2, c.getContext("2d"));
+          text(inventory[i].count, tw * i + w / 2 + spacing, c.height / 2, c.getContext("2d"), { align: "center", baseline: "middle", font: "80px monospace" });
+        }
+      }
+
       function loop() {
         // remove later
         if (playerMoved) {
@@ -566,8 +652,19 @@
         cameraX = Math.max(cameraWidth / 2, Math.min(xCellCount - cameraWidth / 2, player.x));
         cameraY = Math.max(cameraHeight / 2, Math.min(yCellCount - cameraHeight / 2, player.y));
         render();
+        renderInventory();
         requestAnimationFrame(loop);
       }
+
+      let lastScrollTime = performance.now();
+      window.addEventListener("wheel", (event) => {
+        if (performance.now() - lastScrollTime > 100) return;
+        if (event.deltaY < 0) {
+          selectedItem = Math.max(0, selectedItem - 1);
+        } else if (event.deltaY > 0) {
+          selectedItem = Math.min(inventory.length - 1, selectedItem + 1);
+        }
+      });
 
       requestAnimationFrame(loop);
     </script>
