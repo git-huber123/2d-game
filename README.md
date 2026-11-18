@@ -7,7 +7,8 @@ You can move around
 There are walls
 There are enemies
 You can place blocks
-Enemies have intelligent pathfinding, instead of just randomly walking towards you like my other games.
+Enemies have intelligent pathfinding, instead of just randomly walking towards you like my other games
+There's an inventory system
 
 Known bugs: \* FIXED \* The enemies can get stuck in each other, even though I have a checkEnemyCollisions() function.
 
