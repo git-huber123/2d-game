@@ -4,12 +4,13 @@
 
 At the moment, ~8.2 hours. I'm including this so it's possible for reviewers to match up my time spent with my commits.
 
-| Commit          | Time       | Time since last commit  |
-| --------------- | ---------- | ----------------------- |
-| Enemy Attacking | 10.5 hours | 0.9 hours               |
-| Powerup System  | 9.6 hours  | 1.1 hours               |
-| Scoring         | 8.5 hours  | 0.3 hours               |
-| Line of sight   | 8.2 hours  | N/A, first time tracked |
+| Commit          | Time       | Time since last commit  | Notes                                                                  |
+| --------------- | ---------- | ----------------------- | ---------------------------------------------------------------------- |
+| Explosions      | 11.1 hours | 0.6 hours               | This'll be incorporated into a weapon or powerup later                 |
+| Enemy Attacking | 10.5 hours | 0.9 hours               | This'll also be turned into a weapon, instead of being point-and-click |
+| Powerup System  | 9.6 hours  | 1.1 hours               | Pretty cool, step away from a pure sandbox game                        |
+| Scoring         | 8.5 hours  | 0.3 hours               | Simple yet effective                                                   |
+| Line of sight   | 8.2 hours  | N/A, first time tracked | Proud of this one!                                                     |
 
 ## Playing the game:
 
