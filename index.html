@@ -255,6 +255,9 @@
       let cameraX = 50;
       let cameraY = 50;
 
+      let timeSurvived = 0;
+      let countTime = true;
+
       const player = { x: 50, y: 50, health: 10 };
       const cameraWidth = width / cellSize;
       const cameraHeight = height / cellSize;
@@ -457,12 +460,14 @@
             if (!getTile(player.x, player.y - 1)?.collision()) {
               playerMoved = true;
               player.y -= 1;
+              lastActualMove = performance.now();
             }
             lastMove = performance.now();
           } else if (keys.s && player.y < yCellCount - 1 && !playerMoved) {
             if (!getTile(player.x, player.y + 1)?.collision()) {
               playerMoved = true;
               player.y += 1;
+              lastActualMove = performance.now();
             }
 
             lastMove = performance.now();
@@ -471,6 +476,7 @@
             if (!getTile(player.x - 1, player.y)?.collision()) {
               playerMoved = true;
               player.x -= 1;
+              lastActualMove = performance.now();
             }
 
             lastMove = performance.now();
@@ -479,6 +485,7 @@
             if (!getTile(player.x + 1, player.y)?.collision()) {
               playerMoved = true;
               player.x += 1;
+              lastActualMove = performance.now();
             }
 
             lastMove = performance.now();
@@ -563,6 +570,7 @@
           }
           drawLine(line.start.x * cellSize + cellSize / 2, line.start.y * cellSize + cellSize / 2, line.end.x * cellSize + cellSize / 2, line.end.y * cellSize + cellSize / 2, "black", 2);
         }
+        text(String(Math.round(timeSurvived / 10)), 50, 50, ctx, { font: "50px monospace", color: "black" });
       }
 
       function damagePlayer() {
@@ -593,6 +601,27 @@
         playerMoved = false;
         lineOfSightLines = [];
         const bfsMap = fillBfs(map);
+
+        let sampledCells = 0;
+        let successCells = 0;
+        let failCells = 0;
+        for (let i = 0; i < 1000; i++) {
+          if (sampledCells >= 50) i = 1000;
+          const x = random(1, xCellCount - 2);
+          const y = random(1, yCellCount - 2);
+          const m = bfsMap[y][x];
+          if (getTile(x, y).collision()) continue;
+          if (m.x === 0 && m.y === 0 && player.x !== m.x && player.y !== m.y) {
+            failCells += 1;
+            continue;
+          }
+          successCells += 1;
+        }
+
+        const r = failCells / (failCells + successCells);
+        if (r > 0.25) {
+          countTime = false;
+        } else countTime = true;
 
         for (let enemy of enemies) {
           const enemyMap = getEnemyMap();
@@ -718,6 +747,9 @@
         }
       }
 
+      let lastTimeChecked = performance.now();
+      let lastActualMove = performance.now();
+
       function loop() {
         // remove later
         if (playerMoved) {
@@ -730,6 +762,11 @@
         cameraY = Math.max(cameraHeight / 2, Math.min(yCellCount - cameraHeight / 2, player.y));
         render();
         renderInventory();
+        if (countTime && performance.now() - lastActualMove < 250) {
+          timeSurvived += performance.now() - lastTimeChecked;
+        }
+        lastTimeChecked = performance.now();
+        console.log(Math.round(timeSurvived));
         requestAnimationFrame(loop);
       }
 
