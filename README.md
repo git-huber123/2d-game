@@ -4,10 +4,11 @@
 
 At the moment, ~8.2 hours. I'm including this so it's possible for reviewers to match up my time spent with my commits.
 
-| Commit        | Time      | Time since last commit  |
-| ------------- | --------- | ----------------------- |
-| Scoring       | 8.5 hours | 0.3 hours               |
-| Line of sight | 8.2 hours | N/A, first time tracked |
+| Commit         | Time      | Time since last commit  |
+| -------------- | --------- | ----------------------- |
+| Powerup System | 9.6 hours | 1.1 hours               |
+| Scoring        | 8.5 hours | 0.3 hours               |
+| Line of sight  | 8.2 hours | N/A, first time tracked |
 
 ## Playing the game:
 
