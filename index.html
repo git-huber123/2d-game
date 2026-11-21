@@ -28,7 +28,10 @@
     <canvas id="inventory" style="width: 90vw; height: 10vh"></canvas>
 
     <script>
-      // test comment
+      const seed = Math.random();
+      const seedInt = Math.floor(seed * 2 ** 32) >>> 0;
+      let state = seedInt;
+
       // |-------------------------------|
       // |      START OF AI SECTION      |
       // |-------------------------------|
@@ -74,37 +77,6 @@
         c.restore();
       }
 
-      function averageHSL(colors) {
-        let sumX = 0;
-        let sumY = 0;
-        let sumS = 0;
-        let sumL = 0;
-
-        for (const { h, s, l } of colors) {
-          const rad = (h * Math.PI) / 180;
-          sumX += Math.cos(rad);
-          sumY += Math.sin(rad);
-          sumS += s;
-          sumL += l;
-        }
-
-        const count = colors.length;
-        const avgX = sumX / count;
-        const avgY = sumY / count;
-
-        // Convert averaged vector back to degrees
-        let avgH = (Math.atan2(avgY, avgX) * 180) / Math.PI;
-        if (avgH < 0) {
-          avgH += 360;
-        }
-
-        return {
-          h: avgH,
-          s: sumS / count,
-          l: sumL / count,
-        };
-      }
-
       // Returns a float in [0, 1), like Math.random(), but seeded
       function next() {
         state = (state + 0x6d2b79f5) >>> 0;
@@ -139,7 +111,9 @@
       function setTile(x, y, id) {
         // written by AI
 
-        if (inBounds(x, y)) map[y][x] = id;
+        if (!inBounds(x, y)) return;
+        if (getTile(x, y).type === "barrier") return;
+        map[y][x] = id;
       }
 
       function rect(x, y, width, height, color = "black", strokeColor = "black", strokeWidth = 0, c = ctx) {
@@ -240,6 +214,71 @@
 
       let facing = { x: 0, y: -1 };
 
+      const powerupTypes = [
+        {
+          name: "teleport",
+          description: "teleports you away from enemies",
+          color: { h: 108, s: 50, l: 30 },
+          usage: () => {
+            let bestDist = -Infinity;
+            let bestMove = { x: player.x, y: player.y };
+            for (let i = 0; i < 100; i++) {
+              const x = random(1, xCellCount - 2);
+              const y = random(1, yCellCount - 2);
+              if (getTile(x, y).collision()) continue;
+              let dist = Infinity;
+              for (const e of enemies) {
+                const d = (x - e.x) * (x - e.x) + (y - e.y) * (y - e.y);
+                if (d < dist) {
+                  dist = d;
+                }
+              }
+              if (dist > bestDist) {
+                bestMove = { x, y };
+                bestDist = dist;
+              }
+            }
+            player.x = bestMove.x;
+            player.y = bestMove.y;
+          },
+        },
+        {
+          name: "box",
+          description: "creates a 5x5 box around you",
+          color: { h: 25, s: 30, l: 22 },
+          usage: () => {
+            fillRect(player.x - 2, player.y - 2, player.x + 2, player.y + 2, "wall");
+            fillRect(player.x - 1, player.y - 1, player.x + 1, player.y + 1, "grass");
+            let c = 0;
+            for (let i = -2; i <= 2; i++) {
+              for (let j = -2; j <= 2; j++) {
+                for (let ei = enemies.length - 1; ei >= 0; ei--) {
+                  const e = enemies[ei];
+                  if (e.x === i + player.x && e.y === j + player.y) {
+                    c++;
+                    enemies.splice(ei, 1);
+                  }
+                }
+              }
+            }
+            for (let i = 0; i < c; i++) {
+              spawnEnemy();
+            }
+          },
+        },
+        {
+          name: "invisible",
+          description: "makes you undetectable by enemies for 10 seconds",
+          color: { h: 40, s: 20, l: 96 },
+          usage: () => {
+            invisStart = performance.now();
+          },
+        },
+      ];
+
+      let invisStart = -10000;
+      let invisTime = 10 * 1000;
+
       const canvas = document.getElementById("canvas");
       window.addEventListener("resize", resize);
       resize();
@@ -255,6 +294,8 @@
       let cameraX = 50;
       let cameraY = 50;
 
+      const powerups = [];
+
       let timeSurvived = 0;
       let countTime = true;
 
@@ -262,9 +303,6 @@
       const cameraWidth = width / cellSize;
       const cameraHeight = height / cellSize;
 
-      const seed = Math.random();
-      const seedInt = Math.floor(seed * 2 ** 32) >>> 0;
-      let state = seedInt;
       console.log("Seed:", seed);
 
       class Cell {
@@ -312,7 +350,10 @@
 
       const map = Array.from({ length: yCellCount }, (_, y) => Array.from({ length: xCellCount }, (_, x) => new Cell(x, y, "wall")));
 
-      fillRect(0, 0, xCellCount, yCellCount, "barrier");
+      fillRect(0, 0, 1, yCellCount - 1, "barrier");
+      fillRect(xCellCount - 1, 0, xCellCount - 1, yCellCount - 1, "barrier");
+      fillRect(0, 0, xCellCount - 1, 0, "barrier");
+      fillRect(0, yCellCount - 1, xCellCount - 1, yCellCount - 1, "barrier");
       fillRect(1, 1, xCellCount - 2, yCellCount - 2, "grass");
 
       const initialBoulderCount = random(50, 75);
@@ -425,6 +466,7 @@
           if (getTile(x, y).collision()) {
             x = random(1, xCellCount - 2);
             y = random(1, yCellCount - 2);
+            attempts++;
           } else {
             attempts = 101;
           }
@@ -493,17 +535,30 @@
           }
         }
         if (keys[" "]) {
-          playerPlaceBlock();
+          playerUseItem();
           lastMove = performance.now();
         }
       }
 
-      function playerPlaceBlock() {
+      function playerUseItem() {
         const spot = { x: player.x + facing.x, y: player.y + facing.y };
-        if (getTile(spot.x, spot.y).type === "grass" && !checkEnemyCollisions({ id: null, x: spot.x, y: spot.y })) {
-          placeBlock(spot.x, spot.y);
-        } else if (getTile(spot.x, spot.y).isBreakable()) {
+        if (getTile(spot.x, spot.y)?.isBreakable()) {
           breakBlock(spot.x, spot.y);
+          return;
+        }
+        switch (inventory[selectedItem]?.type) {
+          case "block": {
+            if (getTile(spot.x, spot.y).type === "grass" && !checkEnemyCollisions({ id: null, x: spot.x, y: spot.y })) {
+              placeBlock(spot.x, spot.y);
+            }
+
+            break;
+          }
+
+          case "powerup": {
+            inventory[selectedItem].usePowerup();
+            return;
+          }
         }
       }
 
@@ -513,7 +568,10 @@
         if (inventory.length <= 0 && item.count <= 0 && !item.isPlaceable()) return;
 
         inventory[selectedItem].count -= 1;
-        if (inventory[selectedItem].count === 0) inventory.splice(selectedItem, 1);
+        if (inventory[selectedItem].count === 0) {
+          inventory.splice(selectedItem, 1);
+          selectedItem = Math.max(0, Math.min(selectedItem, inventory.length - 1));
+        }
         setTile(x, y, new Cell(x, y, item.blocktype));
       }
 
@@ -538,6 +596,15 @@
             this[key] = value;
           }
         }
+        isPlaceable() {
+          return this.type === "block";
+        }
+        usePowerup(i = inventory.indexOf(this)) {
+          if (this.type !== "powerup") return;
+          inventory.splice(i, 1);
+          this.powerup.usage();
+          selectedItem = Math.max(0, Math.min(inventory.length - 1, selectedItem));
+        }
       }
 
       function render() {
@@ -561,7 +628,6 @@
           const ry = enemy.y - cameraY + cameraHeight / 2;
           rect(rx * cellSize, ry * cellSize, cellSize, cellSize, color);
         }
-        console.log(Object.entries(lineOfSightLines).length);
         for (const line of structuredClone(lineOfSightLines)) {
           for (const p of ["start", "end"]) {
             const obj = line[p];
@@ -570,7 +636,13 @@
           }
           drawLine(line.start.x * cellSize + cellSize / 2, line.start.y * cellSize + cellSize / 2, line.end.x * cellSize + cellSize / 2, line.end.y * cellSize + cellSize / 2, "black", 2);
         }
-        text(String(Math.round(timeSurvived / 10)), 50, 50, ctx, { font: "50px monospace", color: "black" });
+        text(String(Math.round(timeSurvived / 10)), 150, 50, ctx, { font: "50px monospace", color: "black" });
+        for (const p of powerups) {
+          const rx = p.x - cameraX + cameraWidth / 2;
+          const ry = p.y - cameraY + cameraHeight / 2;
+          const rgb = hslToRgb(p.color);
+          rect(rx * cellSize, ry * cellSize, cellSize, cellSize, `rgb(${rgb.r},${rgb.g},${rgb.b})`);
+        }
       }
 
       function damagePlayer() {
@@ -606,12 +678,13 @@
         let successCells = 0;
         let failCells = 0;
         for (let i = 0; i < 1000; i++) {
-          if (sampledCells >= 50) i = 1000;
+          if (sampledCells >= 250) i = 1000;
           const x = random(1, xCellCount - 2);
           const y = random(1, yCellCount - 2);
           const m = bfsMap[y][x];
           if (getTile(x, y).collision()) continue;
-          if (m.x === 0 && m.y === 0 && player.x !== m.x && player.y !== m.y) {
+          sampledCells++;
+          if (m.x === 0 && m.y === 0 && player.x !== x && player.y !== y) {
             failCells += 1;
             continue;
           }
@@ -628,6 +701,7 @@
           //enemy = enemyPathfind(enemy);
           // Check for line-of-sight
           const dist = Math.sqrt((player.x - enemy.x) * (player.x - enemy.x) + (player.y - enemy.y) * (player.y - enemy.y));
+          if (dist === 0) continue;
           const dX = player.x - enemy.x;
           const uX = dX / dist;
           const dY = player.y - enemy.y;
@@ -667,7 +741,11 @@
             move.x = 0;
             move.y = 0;
           }
-          console.log("hi");
+
+          if (performance.now() - invisStart < invisTime) {
+            move.x = 0;
+            move.y = 0;
+          }
 
           if (move.x === 0 && move.y === 0) {
             const possibleMoves = [];
@@ -677,11 +755,13 @@
               [0, 1],
               [0, -1],
             ]) {
-              const e = enemyMap[enemy.y + dy][enemy.x + dx];
-              const t = getTile(enemy.x + dx, enemy.y + dy);
               const nx = enemy.x + dx;
               const ny = enemy.y + dy;
-              if (inBounds(nx, ny) && !getTile(nx, ny).collision() && !enemyMap[ny][nx]) {
+              if (!inBounds(nx, ny)) continue;
+              const e = enemyMap[enemy.y + dy][enemy.x + dx];
+              const t = getTile(enemy.x + dx, enemy.y + dy);
+
+              if (!getTile(nx, ny).collision() && !enemyMap[ny][nx]) {
                 possibleMoves.push({ x: dx, y: dy });
               }
             }
@@ -717,7 +797,6 @@
             const nX = enemy.x + dx;
             const nY = enemy.y + dy;
             if (nX >= 0 && nY >= 0 && nX <= xCellCount - 1 && nY <= yCellCount - 1 && bestDist > bfsMap[nY][nX].distance && !enemyMap[nY][nX] && !getTile(nX, nY).collision()) {
-              console.log(nX, nY, bfsMap[nY][nX]);
               bestDist = bfsMap[nY][nX].distance;
               bestMove = { x: dx, y: dy };
             }
@@ -729,6 +808,36 @@
         }
       }
 
+      let lastPowerupSpawn = performance.now();
+      let powerupSpawnDelay = 15000;
+
+      function spawnPowerup(x = null, y = null) {
+        if (x === null || y === null) {
+          for (let i = 0; i < 123; i++) {
+            x = random(1, xCellCount - 2);
+            y = random(1, yCellCount - 2);
+            if (!getTile(x, y).collision()) break;
+          }
+        }
+        const pt = powerupTypes[random(0, powerupTypes.length - 1)];
+        const p = new Item("powerup", 1, pt.color, { powerup: pt, x: x, y: y });
+        powerups.push(p);
+      }
+
+      function handlePowerups() {
+        if (performance.now() - lastPowerupSpawn > powerupSpawnDelay * (random(0, 10) / 10 + 0.5)) {
+          lastPowerupSpawn = performance.now();
+          spawnPowerup();
+        }
+        for (let i = powerups.length - 1; i >= 0; i--) {
+          const p = powerups[i];
+          if (p.x === player.x && p.y === player.y) {
+            inventory.push(p);
+            powerups.splice(i, 1);
+          }
+        }
+      }
+
       function renderInventory() {
         const c = document.getElementById("inventory");
 
@@ -736,7 +845,7 @@
         c.height = Math.floor(width / 8);
         const w = width / 10;
         const spacing = width / 100;
-        const tw = width + spacing;
+        const tw = w + spacing;
         rect(0, 0, 10000, 100000, "black", "black", 0, c.getContext("2d"));
 
         for (let i = 0; i < inventory.length; i++) {
@@ -762,21 +871,22 @@
         cameraY = Math.max(cameraHeight / 2, Math.min(yCellCount - cameraHeight / 2, player.y));
         render();
         renderInventory();
+        handlePowerups();
         if (countTime && performance.now() - lastActualMove < 250) {
           timeSurvived += performance.now() - lastTimeChecked;
         }
         lastTimeChecked = performance.now();
-        console.log(Math.round(timeSurvived));
         requestAnimationFrame(loop);
       }
 
       let lastScrollTime = performance.now();
       window.addEventListener("wheel", (event) => {
-        if (performance.now() - lastScrollTime > 100) return;
+        if (performance.now() - lastScrollTime < 100) return;
+        lastScrollTime = performance.now();
         if (event.deltaY < 0) {
           selectedItem = Math.max(0, selectedItem - 1);
         } else if (event.deltaY > 0) {
-          selectedItem = Math.min(inventory.length - 1, selectedItem + 1);
+          selectedItem = Math.max(0, Math.min(inventory.length - 1, selectedItem + 1));
         }
       });
 

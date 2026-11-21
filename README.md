@@ -23,11 +23,27 @@ the enemies will also move once. Their line-of-sight lines are drawn on screen.
 Your score is based on how many milliseconds you survive, 100 points for 1 second. If you stop moving for too long, or try to camp in a box, then
 time doesn't count, and it's pretty accurate.
 
+You can get powerups! See the powerups section for more info.
+
 ##### Tips and tricks:
 
 If an enemy is within 2 blocks of you (gap of 1 block between you and the enemy), you're fried, since you won't be able to turn around and place a block
 without the enemy then moving right next to you. Further from them than that, and you're fine, just find a boulder, dig into it, and block off the entrance,
 and boom! Perfect hideout!
+
+## Powerups:
+
+##### Box:
+
+Creates a 5x5 box around you, with a 3x3 space of air inside. Any enemies located in or on the box are relocated.
+
+##### Invisiblity:
+
+Makes the enemies just wander randomly for the next 10 seconds, they can't see you.
+
+##### Teleport:
+
+Checks a bunch of spots, and teleports you to the one with the furthest distance from any enemies.
 
 ## Links:
 
@@ -44,6 +60,7 @@ and boom! Perfect hideout!
 - Enemies have intelligent pathfinding, instead of just randomly walking towards you like my other games, and also have line-of-sight movement
 - There's an inventory system
 - Time-based scoring, with common score-farming methods patched
+- Powerups!
 
 ## Known bugs:
 
@@ -51,7 +68,7 @@ and boom! Perfect hideout!
 
 ## Work in progress:
 
-- A powerup sort of system
+- Improvements on the powerup system.
 
 ## Planned:
 
