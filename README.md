@@ -4,11 +4,12 @@
 
 At the moment, ~8.2 hours. I'm including this so it's possible for reviewers to match up my time spent with my commits.
 
-| Commit         | Time      | Time since last commit  |
-| -------------- | --------- | ----------------------- |
-| Powerup System | 9.6 hours | 1.1 hours               |
-| Scoring        | 8.5 hours | 0.3 hours               |
-| Line of sight  | 8.2 hours | N/A, first time tracked |
+| Commit          | Time       | Time since last commit  |
+| --------------- | ---------- | ----------------------- |
+| Enemy Attacking | 10.5 hours | 0.9 hours               |
+| Powerup System  | 9.6 hours  | 1.1 hours               |
+| Scoring         | 8.5 hours  | 0.3 hours               |
+| Line of sight   | 8.2 hours  | N/A, first time tracked |
 
 ## Playing the game:
 
@@ -25,6 +26,10 @@ Your score is based on how many milliseconds you survive, 100 points for 1 secon
 time doesn't count, and it's pretty accurate.
 
 You can get powerups! See the powerups section for more info.
+
+You can also attack enemies - your mouse position is highlighted via a blue line and a box is drawn on the selected cell. If you click,
+you can attack an enemy, but the enemies will also take a turn and move, even if you miss. It's kinda fun to just hold down the mouse
+and run, beaming enemies while you're at it!
 
 ##### Tips and tricks:
 
