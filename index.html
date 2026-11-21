@@ -33,6 +33,15 @@
       // |      START OF AI SECTION      |
       // |-------------------------------|
 
+      function drawLine(x1, y1, x2, y2, color = "black", lineWidth = 1) {
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+      }
+
       function text(
         text,
         x,
@@ -410,7 +419,7 @@
       function spawnEnemy(health = 5, x = random(1, xCellCount - 2), y = random(1, yCellCount - 2), push = true) {
         let attempts = 0;
         while (attempts < 100) {
-          if (map[y][x].collision()) {
+          if (getTile(x, y).collision()) {
             x = random(1, xCellCount - 2);
             y = random(1, yCellCount - 2);
           } else {
@@ -545,6 +554,15 @@
           const ry = enemy.y - cameraY + cameraHeight / 2;
           rect(rx * cellSize, ry * cellSize, cellSize, cellSize, color);
         }
+        console.log(Object.entries(lineOfSightLines).length);
+        for (const line of structuredClone(lineOfSightLines)) {
+          for (const p of ["start", "end"]) {
+            const obj = line[p];
+            obj.x = Math.round(obj.x - cameraX + cameraWidth / 2);
+            obj.y = Math.round(obj.y - cameraY + cameraHeight / 2);
+          }
+          drawLine(line.start.x * cellSize + cellSize / 2, line.start.y * cellSize + cellSize / 2, line.end.x * cellSize + cellSize / 2, line.end.y * cellSize + cellSize / 2, "black", 2);
+        }
       }
 
       function damagePlayer() {
@@ -565,14 +583,63 @@
         }
       }
 
+      function log(...log) {
+        console.log(log);
+      }
+
+      let lineOfSightLines = [];
+
       function updateEnemies() {
         playerMoved = false;
+        lineOfSightLines = [];
         const bfsMap = fillBfs(map);
 
         for (let enemy of enemies) {
           const enemyMap = getEnemyMap();
           //enemy = enemyPathfind(enemy);
-          const move = bfsMap[enemy.y][enemy.x];
+          // Check for line-of-sight
+          const dist = Math.sqrt((player.x - enemy.x) * (player.x - enemy.x) + (player.y - enemy.y) * (player.y - enemy.y));
+          const dX = player.x - enemy.x;
+          const uX = dX / dist;
+          const dY = player.y - enemy.y;
+          const uY = dY / dist;
+          const maxSteps = Math.max(Math.abs(dX), Math.abs(dY));
+
+          let stepX = 0;
+          let stepY = 0;
+          if (uY === 0) {
+            stepY = 0;
+            stepX = uX > 0 ? 1 : -1;
+          } else if (uX === 0) {
+            stepY = uY > 0 ? 1 : -1;
+            stepX = 0;
+          } else {
+            stepX = dX / maxSteps;
+            stepY = dY / maxSteps;
+          }
+
+          let currentX = enemy.x;
+          let currentY = enemy.y;
+          const xDir = uX > 0 ? 1 : -1;
+          const yDir = uY > 0 ? 1 : -1;
+          let foundIntersection = false;
+          for (let i = 0; i < maxSteps; i++) {
+            currentX += stepX;
+            currentY += stepY;
+
+            if (getTile(Math.round(currentX), Math.round(currentY)).collision()) {
+              foundIntersection = true;
+              break;
+            }
+          }
+
+          const move = structuredClone(bfsMap[enemy.y][enemy.x]);
+          if (foundIntersection) {
+            move.x = 0;
+            move.y = 0;
+          }
+          console.log("hi");
+
           if (move.x === 0 && move.y === 0) {
             const possibleMoves = [];
             for (const [dx, dy] of [
@@ -594,11 +661,15 @@
               enemy.x += possibleMoves[r].x;
               enemy.y += possibleMoves[r].y;
             }
+            lineOfSightLines.push({ start: { x: enemy.x, y: enemy.y }, end: { x: currentX, y: currentY } });
+
             continue;
           }
           if (!enemyMap[enemy.y + move.y]?.[enemy.x + move.x]) {
             enemy.x += move.x;
             enemy.y += move.y;
+            lineOfSightLines.push({ start: { x: enemy.x, y: enemy.y }, end: { x: currentX, y: currentY } });
+
             continue;
           }
           let bestDist = bfsMap[enemy.y][enemy.x].distance;
@@ -609,10 +680,14 @@
             [0, 1],
             [0, -1],
           ]) {
-            if (dx === move.x && dy === move.y) continue;
+            if (dx === move.x && dy === move.y) {
+              lineOfSightLines.push({ start: { x: enemy.x, y: enemy.y }, end: { x: currentX, y: currentY } });
+
+              continue;
+            }
             const nX = enemy.x + dx;
             const nY = enemy.y + dy;
-            if (nX >= 0 && nY >= 0 && nX <= xCellCount - 1 && nY <= yCellCount - 1 && bestDist > bfsMap[nY][nX].distance && !enemyMap[nY][nX] && !map[nY][nX].collision()) {
+            if (nX >= 0 && nY >= 0 && nX <= xCellCount - 1 && nY <= yCellCount - 1 && bestDist > bfsMap[nY][nX].distance && !enemyMap[nY][nX] && !getTile(nX, nY).collision()) {
               console.log(nX, nY, bfsMap[nY][nX]);
               bestDist = bfsMap[nY][nX].distance;
               bestMove = { x: dx, y: dy };
@@ -620,6 +695,8 @@
           }
           enemy.x += bestMove.x;
           enemy.y += bestMove.y;
+
+          lineOfSightLines.push({ start: { x: enemy.x, y: enemy.y }, end: { x: currentX, y: currentY } });
         }
       }
 
