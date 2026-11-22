@@ -201,6 +201,110 @@
       // |      END OF AI SECTION      |
       // |-----------------------------|
 
+      class Enemy {
+        constructor(type = r(0, 1), health = null, x = random(1, xCellCount - 2), y = random(1, yCellCount - 2), push = true) {
+          if (typeof type === "number") {
+            type = type < 0.65 ? "normal" : type < 0.95 ? "ranged" : "bomber";
+          }
+          let attempts = 0;
+          while (attempts < 100) {
+            if (getTile(x, y).collision()) {
+              x = random(1, xCellCount - 2);
+              y = random(1, yCellCount - 2);
+              attempts++;
+            } else {
+              attempts = 101;
+            }
+          }
+
+          if (health === null) health = { normal: 5, ranged: 3, bomber: 1 }[type];
+          if (health === undefined) return;
+
+          this.id = crypto.randomUUID();
+          this.health = health;
+          this.x = x;
+          this.y = y;
+          this.maxHealth = health;
+          this.type = type;
+
+          switch (type) {
+            case "ranged":
+              this.losTurnsTaken = 0;
+              this.hasLineOfSight = false;
+              this.turnsNeeded = 25;
+              break;
+            case "bomber": {
+              this.range = 3;
+            }
+          }
+
+          if (push) enemies.push(this);
+        }
+
+        getColor() {
+          switch (this.type) {
+            case "normal":
+              const r = Math.floor((255 * this.health) / this.maxHealth);
+              return "rgb(" + r + ",0,0)";
+              break;
+            case "ranged":
+              const r2 = Math.floor((200 * this.health) / this.maxHealth);
+              const b2 = Math.floor((255 * this.health) / this.maxHealth);
+              return "rgb(" + r2 + ",0," + b2 + ")";
+            case "bomber":
+              const r3 = Math.floor((255 * this.health) / this.maxHealth);
+              const g3 = Math.floor((140 * this.health) / this.maxHealth);
+              return "rgb(" + r3 + "," + g3 + ",0)";
+          }
+        }
+
+        checkForAttack() {
+          switch (this.type) {
+            case "normal": {
+              if (player.x === this.x && player.y === this.y) return true;
+              return false;
+              break;
+            }
+            case "ranged": {
+              const los = hasLineOfSight({ x: this.x, y: this.y }, { x: player.x, y: player.y }, true);
+              this.hasLineOfSight = los.hasLineOfSight;
+
+              if (this.hasLineOfSight) {
+                this.losTurnsTaken += 1;
+                lineOfSightLines.push({ start: los.s1, end: los.s2, color: `rgba(255, 0, 0, ${this.losTurnsTaken / this.turnsNeeded})` });
+
+                if (this.losTurnsTaken > this.turnsNeeded) {
+                  this.hasLineOfSight = false;
+                  this.losTurnsTaken = 0;
+                  return true;
+                } else return false;
+              } else {
+                lineOfSightLines.push({ start: los.s1, end: los.s2, color: `rgba(255, 0, 0, ${this.losTurnsTaken / this.turnsNeeded})` });
+                this.losTurnsTaken = 0;
+                this.hasLineOfSight = false;
+                return false;
+              }
+            }
+            case "bomber": {
+              const dist = getDist({ x: this.x, y: this.y }, { x: player.x, y: player.y });
+              if (dist > this.range * this.range) return false;
+              explosion(this.x, this.y, 5);
+              return true;
+            }
+          }
+          return false;
+        }
+      }
+
+      function getDist(p1, p2) {
+        const x1 = p1.x;
+        const x2 = p2.x;
+        const y1 = p1.y;
+        const y2 = p2.y;
+
+        return (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
+      }
+
       /**
        * Fills a rectangle on the map.
        *
@@ -273,7 +377,7 @@
               }
             }
             for (let i = 0; i < c; i++) {
-              spawnEnemy();
+              new Enemy();
             }
           },
         },
@@ -381,7 +485,7 @@
       const enemies = [];
       const initialEnemyCount = random(5, 15);
       for (let i = 0; i < initialEnemyCount; i++) {
-        spawnEnemy();
+        new Enemy();
       }
 
       function checkEnemyCollisions(enemy, mx = 0, my = 0) {
@@ -472,25 +576,48 @@
         return enemy;
       }
 
-      function spawnEnemy(health = 5, x = random(1, xCellCount - 2), y = random(1, yCellCount - 2), push = true) {
-        let attempts = 0;
-        while (attempts < 100) {
-          if (getTile(x, y).collision()) {
-            x = random(1, xCellCount - 2);
-            y = random(1, yCellCount - 2);
-            attempts++;
+      function hasLineOfSight(s1, s2, endpoints = false) {
+        const dist = Math.sqrt((s1.x - s2.x) * (s1.x - s2.x) + (s1.y - s2.y) * (s1.y - s2.y));
+        if (dist !== 0) {
+          const dX = s1.x - s2.x;
+          const uX = dX / dist;
+          const dY = s1.y - s2.y;
+          const uY = dY / dist;
+          const maxSteps = Math.max(Math.abs(dX), Math.abs(dY));
+
+          let stepX = 0;
+          let stepY = 0;
+          if (uY === 0) {
+            stepY = 0;
+            stepX = uX > 0 ? 1 : -1;
+          } else if (uX === 0) {
+            stepY = uY > 0 ? 1 : -1;
+            stepX = 0;
           } else {
-            attempts = 101;
+            stepX = dX / maxSteps;
+            stepY = dY / maxSteps;
+          }
+
+          let currentX = s2.x;
+          let currentY = s2.y;
+          const xDir = uX > 0 ? 1 : -1;
+          const yDir = uY > 0 ? 1 : -1;
+          for (let i = 0; i < maxSteps; i++) {
+            currentX += stepX;
+            currentY += stepY;
+
+            if (getTile(Math.round(currentX), Math.round(currentY)).collision()) {
+              if (endpoints) {
+                return { hasLineOfSight: false, s1: s1, s2: { x: currentX, y: currentY } };
+              }
+              return false;
+            }
           }
         }
-        const enemy = {};
-        enemy.id = crypto.randomUUID();
-        enemy.health = health;
-        enemy.x = x;
-        enemy.y = y;
-        enemy.maxHealth = health;
-        if (push) enemies.push(enemy);
-        return enemy;
+        if (endpoints) {
+          return { hasLineOfSight: true, s1: s1, s2: s2 };
+        }
+        return true;
       }
 
       const keys = {};
@@ -726,7 +853,7 @@
           }
         }
         for (const enemy of enemies) {
-          const color = "rgb(" + Math.floor(255 * (enemy.health / enemy.maxHealth)) + ",0,0)";
+          const color = enemy.getColor();
           const rx = enemy.x - cameraX + cameraWidth / 2;
           const ry = enemy.y - cameraY + cameraHeight / 2;
           rect(rx * cellSize, ry * cellSize, cellSize, cellSize, color);
@@ -737,7 +864,7 @@
             obj.x = Math.round(obj.x - cameraX + cameraWidth / 2);
             obj.y = Math.round(obj.y - cameraY + cameraHeight / 2);
           }
-          drawLine(line.start.x * cellSize + cellSize / 2, line.start.y * cellSize + cellSize / 2, line.end.x * cellSize + cellSize / 2, line.end.y * cellSize + cellSize / 2, "black", 2);
+          drawLine(line.start.x * cellSize + cellSize / 2, line.start.y * cellSize + cellSize / 2, line.end.x * cellSize + cellSize / 2, line.end.y * cellSize + cellSize / 2, line.color || "black", 2);
         }
         text(String(Math.round(timeSurvived / 10)), 150, 50, ctx, { font: "50px monospace", color: "black" });
         for (const p of powerups) {
@@ -779,7 +906,7 @@
 
       function damagePlayer() {
         for (const enemy of enemies) {
-          if (enemy.x === player.x && enemy.y === player.y) {
+          if (enemy.checkForAttack()) {
             player.health -= 1;
             let foundValidSpot = false;
             let i = 0;
@@ -938,6 +1065,20 @@
 
           lineOfSightLines.push({ start: { x: enemy.x, y: enemy.y }, end: { x: currentX, y: currentY } });
         }
+        for (const enemy of enemies) {
+          if (enemy.checkForAttack()) {
+            player.health -= 1;
+            let foundValidSpot = false;
+            let i = 0;
+            while (!foundValidSpot) {
+              i++;
+              if (i > 100) foundValidSpot = true;
+              player.x = random(1, xCellCount - 2);
+              player.y = random(1, yCellCount - 2);
+              if (!getTile(player.x, player.y)?.collision() && !checkEnemyCollisions(player)) foundValidSpot = true;
+            }
+          }
+        }
       }
 
       let lastPowerupSpawn = performance.now();
@@ -998,7 +1139,7 @@
         } else {
           handleMovement();
         }
-        damagePlayer();
+        //damagePlayer();
         cameraX = Math.max(cameraWidth / 2, Math.min(xCellCount - cameraWidth / 2, player.x));
         cameraY = Math.max(cameraHeight / 2, Math.min(yCellCount - cameraHeight / 2, player.y));
         render();

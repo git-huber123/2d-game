@@ -6,6 +6,7 @@ At the moment, ~8.2 hours. I'm including this so it's possible for reviewers to 
 
 | Commit          | Time       | Time since last commit  | Notes                                                                  |
 | --------------- | ---------- | ----------------------- | ---------------------------------------------------------------------- |
+| New Enemies     | 12.1 hours | 1.0 hours               | 2 new enemies, pretty cool.                                            |
 | Explosions      | 11.1 hours | 0.6 hours               | This'll be incorporated into a weapon or powerup later                 |
 | Enemy Attacking | 10.5 hours | 0.9 hours               | This'll also be turned into a weapon, instead of being point-and-click |
 | Powerup System  | 9.6 hours  | 1.1 hours               | Pretty cool, step away from a pure sandbox game                        |
@@ -31,6 +32,24 @@ You can get powerups! See the powerups section for more info.
 You can also attack enemies - your mouse position is highlighted via a blue line and a box is drawn on the selected cell. If you click,
 you can attack an enemy, but the enemies will also take a turn and move, even if you miss. It's kinda fun to just hold down the mouse
 and run, beaming enemies while you're at it!
+
+##### Enemies:
+
+There are 3 types of enemies:
+
+###### Normal:
+
+These enemies are red in color, and damage you if they manage to touch you (not adjacent, but on the same square as you)
+
+###### Ranged:
+
+These enemies are magenta in color, and damage you if they have a line-of-sight on you for 25 turns. You can see their line-of-sight line turn red
+as they lock onto you.
+
+###### Bombers:
+
+These enemies come close to you, and damage you and explode if they're close enough. They're also immune to explosions, so one enemy could explode you
+multiple times, since they don't die from explosions.
 
 ##### Tips and tricks:
 
