@@ -231,7 +231,7 @@
             case "ranged":
               this.losTurnsTaken = 0;
               this.hasLineOfSight = false;
-              this.turnsNeeded = 25;
+              this.turnsNeeded = 50;
               break;
             case "bomber": {
               this.range = 3;
@@ -259,17 +259,14 @@
         }
 
         checkForAttack() {
+          if (player.x === this.x && player.y === this.y) return true;
+
           switch (this.type) {
-            case "normal": {
-              if (player.x === this.x && player.y === this.y) return true;
-              return false;
-              break;
-            }
             case "ranged": {
               const los = hasLineOfSight({ x: this.x, y: this.y }, { x: player.x, y: player.y }, true);
               this.hasLineOfSight = los.hasLineOfSight;
 
-              if (this.hasLineOfSight) {
+              if (this.hasLineOfSight && performance.now() - invisStart < invisTime) {
                 this.losTurnsTaken += 1;
                 lineOfSightLines.push({ start: los.s1, end: los.s2, color: `rgba(255, 0, 0, ${this.losTurnsTaken / this.turnsNeeded})` });
 
@@ -407,6 +404,8 @@
       const xCellCount = 100;
       const yCellCount = 100;
 
+      let dashCooldown = 15;
+
       let cameraX = 50;
       let cameraY = 50;
 
@@ -483,7 +482,7 @@
       setTile(player.x, player.y, new Cell(player.x, player.y, "grass"));
 
       const enemies = [];
-      const initialEnemyCount = random(5, 15);
+      const initialEnemyCount = random(10, 18);
       for (let i = 0; i < initialEnemyCount; i++) {
         new Enemy();
       }
@@ -707,6 +706,54 @@
       function handleMovement() {
         if (performance.now() - lastMove < 100) return;
         if (!playerMoved) {
+          if (keys.shift && dashCooldown <= 0) {
+            const nx = player.x + facing.x * 2;
+            const ny = player.y + facing.y * 2;
+
+            const doDash = () => {
+              player.x = player.x + facing.x * 2;
+              player.y = player.y + facing.y * 2;
+              dashCooldown = 15;
+            };
+            switch (facing.x + "," + facing.y) {
+              case "0,-1": {
+                if (player.y < yCellCount - 2 && !getTile(nx, ny).collision()) {
+                  doDash();
+                }
+                break;
+              }
+              case "0,1": {
+                if (player.y > 1 && !getTile(nx, ny).collision()) {
+                  doDash();
+                }
+                break;
+              }
+              case "1,0": {
+                if (player.x > 1 && !getTile(nx, ny).collision()) {
+                  doDash();
+                }
+                break;
+              }
+              case "-1,0": {
+                if (player.x < xCellCount - 2 && !getTile(nx, ny).collision()) {
+                  doDash();
+                }
+                break;
+              }
+            }
+          }
+
+          const facingDirs = {
+            arrowdown: { x: 0, y: 1 },
+            arrowup: { x: 0, y: -1 },
+            arrowleft: { x: -1, y: 0 },
+            arrowright: { x: 1, y: 0 },
+          };
+
+          for (const key in facingDirs) {
+            if (keys[key]) facing = facingDirs[key];
+          }
+
           if (keys.w && player.y > 0 && !playerMoved) {
             facing = { x: 0, y: -1 };
             if (!getTile(player.x, player.y - 1)?.collision()) {
@@ -1081,8 +1128,10 @@
         }
       }
 
-      let lastPowerupSpawn = performance.now();
-      let powerupSpawnDelay = 15000;
+      let powerupSpawnDelay = () => {
+        return 5 * 1000 * (random(0, 10) / 10 + 0.5);
+      };
+      let nextPowerupSpawn = performance.now() + powerupSpawnDelay();
 
       function spawnPowerup(x = null, y = null) {
         if (x === null || y === null) {
@@ -1098,8 +1147,8 @@
       }
 
       function handlePowerups() {
-        if (performance.now() - lastPowerupSpawn > powerupSpawnDelay * (random(0, 10) / 10 + 0.5)) {
-          lastPowerupSpawn = performance.now();
+        if (performance.now() > nextPowerupSpawn) {
+          nextPowerupSpawn = performance.now() + powerupSpawnDelay();
           spawnPowerup();
         }
         for (let i = powerups.length - 1; i >= 0; i--) {
@@ -1124,7 +1173,9 @@
         for (let i = 0; i < inventory.length; i++) {
           const rgb = hslToRgb(inventory[i].color);
           const color = `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
-          rect(spacing + tw * i, c.height / 5, w - spacing, (c.height * 3) / 5, color, "black", i === selectedItem ? 8 : 2, c.getContext("2d"));
+          rect(spacing + tw * i, c.height / 5, w - spacing, (c.height * 3) / 5, color, "black", i === selectedItem ? 20 : 2, c.getContext("2d"));
+          if (i === selectedItem) rect(spacing + tw * i - 20, c.height / 5 - 20, w - spacing + 40, (c.height * 3) / 5 + 40, "rgba(0, 0, 0, 0)", "red", 20, c.getContext("2d"));
+
           text(inventory[i].count, tw * i + w / 2 + spacing, c.height / 2, c.getContext("2d"), { align: "center", baseline: "middle", font: "80px monospace" });
         }
       }
@@ -1135,6 +1186,7 @@
       function loop() {
         // remove later
         if (playerMoved) {
+          dashCooldown -= 1;
           updateEnemies();
         } else {
           handleMovement();

@@ -17,7 +17,8 @@ At the moment, ~8.2 hours. I'm including this so it's possible for reviewers to 
 
 ##### Controls:
 
-WASD to move around, and spacebar to place/break blocks.
+WASD to move around, and spacebar to place/break blocks. Arrow keys to change the direction you're facing. That matters because you place
+blocks in the direction you're facing and it also determines which direction you dash in. Press Shift to dash every 15 moves.
 
 ##### Mechanics:
 
@@ -32,6 +33,27 @@ You can get powerups! See the powerups section for more info.
 You can also attack enemies - your mouse position is highlighted via a blue line and a box is drawn on the selected cell. If you click,
 you can attack an enemy, but the enemies will also take a turn and move, even if you miss. It's kinda fun to just hold down the mouse
 and run, beaming enemies while you're at it!
+
+## Links:
+
+- https://git-huber123.itch.io/2d-game - itch.io page
+- https://git-huber123.github.io/2d-game/ - github page
+- https://github.com/git-huber123/2d-game - github repo
+- https://www.youtube.com/watch?v=7NOTmrdaDT8 - youtube video of someone playing it (they found my itch page)
+
+## Features:
+
+- You can move around
+- There are walls
+- There are enemies
+- You can place and break blocks
+- Enemies have intelligent pathfinding, instead of just randomly walking towards you like my other games, and also have line-of-sight movement
+- There's an inventory system
+- Time-based scoring, with common score-farming methods patched
+- Powerups!
+- You can press shift to dash!
+
+## General info:
 
 ##### Enemies:
 
@@ -53,9 +75,7 @@ multiple times, since they don't die from explosions.
 
 ##### Tips and tricks:
 
-If an enemy is within 2 blocks of you (gap of 1 block between you and the enemy), you're fried, since you won't be able to turn around and place a block
-without the enemy then moving right next to you. Further from them than that, and you're fine, just find a boulder, dig into it, and block off the entrance,
-and boom! Perfect hideout!
+If an enemy is too close to you, it used to be that you'd be in trouble, but now you can press shift to dash away! There's a cooldown on it though, every 15 moves.
 
 ## Powerups:
 
@@ -70,23 +90,6 @@ Makes the enemies just wander randomly for the next 10 seconds, they can't see y
 ##### Teleport:
 
 Checks a bunch of spots, and teleports you to the one with the furthest distance from any enemies.
-
-## Links:
-
-- https://git-huber123.itch.io/2d-game - itch.io page
-- https://git-huber123.github.io/2d-game/ - github page
-- https://github.com/git-huber123/2d-game - github repo
-
-## Features:
-
-- You can move around
-- There are walls
-- There are enemies
-- You can place and break blocks
-- Enemies have intelligent pathfinding, instead of just randomly walking towards you like my other games, and also have line-of-sight movement
-- There's an inventory system
-- Time-based scoring, with common score-farming methods patched
-- Powerups!
 
 ## Known bugs:
 

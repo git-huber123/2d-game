@@ -1,0 +1,1233 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Cool 2d Game</title>
+    <meta name="viewport" />
+    <style>
+      #canvas {
+        display: block;
+        image-rendering: pixelated;
+        max-width: 90vw;
+        max-height: 80vh;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <canvas id="inventory"></canvas>
+
+    <script>
+      const seed = Math.random();
+      const seedInt = Math.floor(seed * 2 ** 32) >>> 0;
+      let state = seedInt;
+
+      // |-------------------------------|
+      // |      START OF AI SECTION      |
+      // |-------------------------------|
+
+      function drawLine(x1, y1, x2, y2, color = "black", lineWidth = 1) {
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+      }
+
+      function text(
+        text,
+        x,
+        y,
+        c = ctx,
+        {
+          color = "white",
+          font = "20px monospace",
+          align = "left", // "left", "center", or "right"
+          baseline = "top", // "top", "middle", "bottom", or "alphabetic"
+          strokeColor = null,
+          strokeWidth = 0,
+        } = {},
+      ) {
+        c.save(); // Saves current canvas settings so alignment changes don't affect other text
+        c.font = font;
+        c.textAlign = align;
+        c.textBaseline = baseline;
+
+        if (strokeWidth > 0 && strokeColor) {
+          c.lineWidth = strokeWidth;
+          c.strokeStyle = strokeColor;
+          c.strokeText(text, x, y);
+        }
+
+        if (color) {
+          c.fillStyle = color;
+          c.fillText(text, x, y);
+        }
+        c.restore();
+      }
+
+      // Returns a float in [0, 1), like Math.random(), but seeded
+      function next() {
+        state = (state + 0x6d2b79f5) >>> 0;
+        let t = state;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      }
+
+      // Random float between min and max
+      function r(min, max) {
+        return min + next() * (max - min);
+      }
+
+      // Random integer between min and max, inclusive
+      function random(min, max) {
+        return Math.floor(r(min, max + 1));
+      }
+
+      function inBounds(x, y) {
+        // written by AI
+
+        return x >= 0 && x < xCellCount && y >= 0 && y < yCellCount;
+      }
+
+      function getTile(x, y) {
+        // written by AI
+
+        return inBounds(x, y) ? (map?.[y]?.[x] ?? null) : null; // null = outside the world
+      }
+
+      function setTile(x, y, id) {
+        // written by AI
+
+        if (!inBounds(x, y)) return;
+        if (getTile(x, y).type === "barrier") return;
+        map[y][x] = id;
+      }
+
+      function rect(x, y, width, height, color = "black", strokeColor = "black", strokeWidth = 0, c = ctx) {
+        // written by AI
+        c.fillStyle = color;
+        c.fillRect(x, y, width, height);
+
+        if (strokeWidth > 0) {
+          c.lineWidth = strokeWidth;
+          c.strokeStyle = strokeColor;
+          c.strokeRect(x, y, width, height);
+        }
+      }
+
+      function hash(x, y) {
+        let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + seedInt) | 0;
+        h = Math.imul(h ^ (h >>> 13), 1274126177);
+        return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+      }
+
+      function resize() {
+        const maxWidth = window.innerWidth * 0.9; // matches 90vw
+        const maxHeight = window.innerHeight * 0.8; // matches 80vh
+        const scale = Math.min(maxWidth / canvas.width, maxHeight / canvas.height);
+
+        canvas.style.width = Math.floor(canvas.width * scale) + "px";
+        canvas.style.height = Math.floor(canvas.height * scale) + "px";
+      }
+
+      function hslToRgb({ h, s, l }) {
+        // Normalize hue to [0, 360) and percentages to [0, 1]
+        h = ((h % 360) + 360) % 360;
+        s /= 100;
+        l /= 100;
+
+        const c = (1 - Math.abs(2 * l - 1)) * s;
+        const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+        const m = l - c / 2;
+
+        let r = 0,
+          g = 0,
+          b = 0;
+
+        if (0 <= h && h < 60) {
+          r = c;
+          g = x;
+          b = 0;
+        } else if (60 <= h && h < 120) {
+          r = x;
+          g = c;
+          b = 0;
+        } else if (120 <= h && h < 180) {
+          r = 0;
+          g = c;
+          b = x;
+        } else if (180 <= h && h < 240) {
+          r = 0;
+          g = x;
+          b = c;
+        } else if (240 <= h && h < 300) {
+          r = x;
+          g = 0;
+          b = c;
+        } else if (300 <= h && h < 360) {
+          r = c;
+          g = 0;
+          b = x;
+        }
+
+        return {
+          r: Math.round((r + m) * 255),
+          g: Math.round((g + m) * 255),
+          b: Math.round((b + m) * 255),
+        };
+      }
+
+      function getScaledMousePos(canvas, event) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+
+        return {
+          x: (event.clientX - rect.left) * scaleX,
+          y: (event.clientY - rect.top) * scaleY,
+        };
+      }
+
+      // |-----------------------------|
+      // |      END OF AI SECTION      |
+      // |-----------------------------|
+
+      class Enemy {
+        constructor(type = r(0, 1), health = null, x = random(1, xCellCount - 2), y = random(1, yCellCount - 2), push = true) {
+          if (typeof type === "number") {
+            type = type < 0.65 ? "normal" : type < 0.95 ? "ranged" : "bomber";
+          }
+          let attempts = 0;
+          while (attempts < 100) {
+            if (getTile(x, y).collision()) {
+              x = random(1, xCellCount - 2);
+              y = random(1, yCellCount - 2);
+              attempts++;
+            } else {
+              attempts = 101;
+            }
+          }
+
+          if (health === null) health = { normal: 5, ranged: 3, bomber: 1 }[type];
+          if (health === undefined) return;
+
+          this.id = crypto.randomUUID();
+          this.health = health;
+          this.x = x;
+          this.y = y;
+          this.maxHealth = health;
+          this.type = type;
+
+          switch (type) {
+            case "ranged":
+              this.losTurnsTaken = 0;
+              this.hasLineOfSight = false;
+              this.turnsNeeded = 50;
+              break;
+            case "bomber": {
+              this.range = 3;
+            }
+          }
+
+          if (push) enemies.push(this);
+        }
+
+        getColor() {
+          switch (this.type) {
+            case "normal":
+              const r = Math.floor((255 * this.health) / this.maxHealth);
+              return "rgb(" + r + ",0,0)";
+              break;
+            case "ranged":
+              const r2 = Math.floor((200 * this.health) / this.maxHealth);
+              const b2 = Math.floor((255 * this.health) / this.maxHealth);
+              return "rgb(" + r2 + ",0," + b2 + ")";
+            case "bomber":
+              const r3 = Math.floor((255 * this.health) / this.maxHealth);
+              const g3 = Math.floor((140 * this.health) / this.maxHealth);
+              return "rgb(" + r3 + "," + g3 + ",0)";
+          }
+        }
+
+        checkForAttack() {
+          if (player.x === this.x && player.y === this.y) return true;
+
+          switch (this.type) {
+            case "ranged": {
+              const los = hasLineOfSight({ x: this.x, y: this.y }, { x: player.x, y: player.y }, true);
+              this.hasLineOfSight = los.hasLineOfSight;
+
+              if (this.hasLineOfSight && performance.now() - invisStart < invisTime) {
+                this.losTurnsTaken += 1;
+                lineOfSightLines.push({ start: los.s1, end: los.s2, color: `rgba(255, 0, 0, ${this.losTurnsTaken / this.turnsNeeded})` });
+
+                if (this.losTurnsTaken > this.turnsNeeded) {
+                  this.hasLineOfSight = false;
+                  this.losTurnsTaken = 0;
+                  return true;
+                } else return false;
+              } else {
+                lineOfSightLines.push({ start: los.s1, end: los.s2, color: `rgba(255, 0, 0, ${this.losTurnsTaken / this.turnsNeeded})` });
+                this.losTurnsTaken = 0;
+                this.hasLineOfSight = false;
+                return false;
+              }
+            }
+            case "bomber": {
+              const dist = getDist({ x: this.x, y: this.y }, { x: player.x, y: player.y });
+              if (dist > this.range * this.range) return false;
+              explosion(this.x, this.y, 5);
+              return true;
+            }
+          }
+          return false;
+        }
+      }
+
+      function getDist(p1, p2) {
+        const x1 = p1.x;
+        const x2 = p2.x;
+        const y1 = p1.y;
+        const y2 = p2.y;
+
+        return (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
+      }
+
+      /**
+       * Fills a rectangle on the map.
+       *
+       * @param sx - start x of the rectangle
+       * @param sy - start y of the rectangle
+       * @param ex - end x of the rectangle
+       * @param ey - end y of the rectangle
+       * @param type - type of tile to fill with
+       */
+      function fillRect(sx, sy, ex, ey, type) {
+        for (let x = sx; x <= ex; x++) {
+          for (let y = sy; y <= ey; y++) {
+            setTile(x, y, new Cell(x, y, type));
+          }
+        }
+      }
+
+      let inventory = [];
+      let selectedItem = 0;
+
+      let facing = { x: 0, y: -1 };
+
+      let mouse = { x: 0, y: 0 };
+
+      const powerupTypes = [
+        {
+          name: "teleport",
+          description: "teleports you away from enemies",
+          color: { h: 108, s: 50, l: 30 },
+          usage: () => {
+            let bestDist = -Infinity;
+            let bestMove = { x: player.x, y: player.y };
+            for (let i = 0; i < 100; i++) {
+              const x = random(1, xCellCount - 2);
+              const y = random(1, yCellCount - 2);
+              if (getTile(x, y).collision()) continue;
+              let dist = Infinity;
+              for (const e of enemies) {
+                const d = (x - e.x) * (x - e.x) + (y - e.y) * (y - e.y);
+                if (d < dist) {
+                  dist = d;
+                }
+              }
+              if (dist > bestDist) {
+                bestMove = { x, y };
+                bestDist = dist;
+              }
+            }
+            player.x = bestMove.x;
+            player.y = bestMove.y;
+          },
+        },
+        {
+          name: "box",
+          description: "creates a 5x5 box around you",
+          color: { h: 25, s: 30, l: 22 },
+          usage: () => {
+            fillRect(player.x - 2, player.y - 2, player.x + 2, player.y + 2, "wall");
+            fillRect(player.x - 1, player.y - 1, player.x + 1, player.y + 1, "grass");
+            let c = 0;
+            for (let i = -2; i <= 2; i++) {
+              for (let j = -2; j <= 2; j++) {
+                for (let ei = enemies.length - 1; ei >= 0; ei--) {
+                  const e = enemies[ei];
+                  if (e.x === i + player.x && e.y === j + player.y) {
+                    c++;
+                    enemies.splice(ei, 1);
+                  }
+                }
+              }
+            }
+            for (let i = 0; i < c; i++) {
+              new Enemy();
+            }
+          },
+        },
+        {
+          name: "invisible",
+          description: "makes you undetectable by enemies for 10 seconds",
+          color: { h: 40, s: 20, l: 96 },
+          usage: () => {
+            invisStart = performance.now();
+          },
+        },
+      ];
+
+      let invisStart = -10000;
+      let invisTime = 10 * 1000;
+
+      const canvas = document.getElementById("canvas");
+      window.addEventListener("resize", resize);
+
+      const ctx = canvas.getContext("2d");
+      const width = 1920;
+      const height = 1024;
+      canvas.width = width;
+      canvas.height = height;
+      resize();
+      const cellSize = 32;
+      const xCellCount = 100;
+      const yCellCount = 100;
+
+      let dashCooldown = 15;
+
+      let cameraX = 50;
+      let cameraY = 50;
+
+      const powerups = [];
+
+      let timeSurvived = 0;
+      let countTime = true;
+
+      const player = { x: 50, y: 50, health: 10 };
+      const cameraWidth = width / cellSize;
+      const cameraHeight = height / cellSize;
+
+      console.log("Seed:", seed);
+
+      class Cell {
+        constructor(x, y, type, color = null) {
+          if (color === null) color = getColor(type);
+          this.x = x;
+          this.y = y;
+          this.type = type;
+          this.color = color;
+        }
+        collision() {
+          return ["wall", "barrier"].includes(this.type);
+        }
+        isBreakable() {
+          return ["wall"].includes(this.type);
+        }
+      }
+
+      function getColor(type) {
+        switch (type) {
+          case "wall":
+            return {
+              h: random(0, 10) + 20,
+              s: random(0, 20) + 20,
+              l: random(0, 10) + 15,
+            };
+          case "grass":
+            return {
+              h: random(0, 25) + 95,
+              s: random(0, 25) + 40,
+              l: random(0, 18) + 20,
+            };
+          default:
+            return {
+              h: random(0, 360),
+              s: 0,
+              l: 0,
+            };
+        }
+      }
+
+      function randomHsl() {
+        return { h: random(0, 360), s: 100, l: random(40, 60) };
+      }
+
+      const map = Array.from({ length: yCellCount }, (_, y) => Array.from({ length: xCellCount }, (_, x) => new Cell(x, y, "wall")));
+
+      fillRect(0, 0, 1, yCellCount - 1, "barrier");
+      fillRect(xCellCount - 1, 0, xCellCount - 1, yCellCount - 1, "barrier");
+      fillRect(0, 0, xCellCount - 1, 0, "barrier");
+      fillRect(0, yCellCount - 1, xCellCount - 1, yCellCount - 1, "barrier");
+      fillRect(1, 1, xCellCount - 2, yCellCount - 2, "grass");
+
+      const initialBoulderCount = random(50, 75);
+      for (let i = 0; i < initialBoulderCount; i++) {
+        const width = random(1, 2);
+        const sx = random(1, xCellCount - 2 - width);
+        const sy = random(1, yCellCount - 2 - width);
+        fillRect(sx, sy, sx + width, sy + width, "wall");
+      }
+
+      setTile(player.x, player.y, new Cell(player.x, player.y, "grass"));
+
+      const enemies = [];
+      const initialEnemyCount = random(10, 18);
+      for (let i = 0; i < initialEnemyCount; i++) {
+        new Enemy();
+      }
+
+      function checkEnemyCollisions(enemy, mx = 0, my = 0) {
+        const ex = enemy.x + mx;
+        const ey = enemy.y + my;
+        for (const e of enemies) {
+          if (enemy.id === e.id) continue;
+          if (ex === e.x && ey === e.y) return true;
+        }
+        return false;
+      }
+
+      function getEnemyMap() {
+        const eMap = Array.from({ length: yCellCount }, (_, y) => Array.from({ length: xCellCount }, (_, x) => false));
+        for (const e of enemies) {
+          eMap[e.y][e.x] = true;
+        }
+        return eMap;
+      }
+
+      /**
+       * Takes the map and fills it out with the directions to the next place to go to
+       *
+       * @param map a 1d array, each item is the corrosponding map cell type, "wall", "grass", etc
+       * @returns map a 2d array, each item is 1 row (array), each row has the direction the enemy should go to get closer to the player
+       */
+      function fillBfs(map) {
+        const enemyMap = getEnemyMap(enemies);
+        const scannedTiles = { [`${player.x},${player.y}`]: { x: player.x, y: player.y, distance: 0, move: { x: 0, y: 0 } } };
+        const edgeTiles = [{ x: player.x, y: player.y, distance: 0, move: { x: 0, y: 0 } }];
+        while (edgeTiles.length > 0) {
+          const cell = edgeTiles.shift();
+          if (cell.y > 0 && !getTile(cell.x, cell.y - 1).collision() && scannedTiles[`${cell.x},${cell.y - 1}`] === undefined) {
+            scannedTiles[`${cell.x},${cell.y - 1}`] = { x: cell.x, y: cell.y - 1, distance: cell.distance + 1, move: { x: 0, y: 1 } };
+            edgeTiles.push({ x: cell.x, y: cell.y - 1, distance: cell.distance + 1, move: { x: 0, y: 1 } });
+          }
+          if (cell.y < yCellCount - 1 && !getTile(cell.x, cell.y + 1).collision() && scannedTiles[`${cell.x},${cell.y + 1}`] === undefined) {
+            scannedTiles[`${cell.x},${cell.y + 1}`] = { x: cell.x, y: cell.y + 1, distance: cell.distance + 1, move: { x: 0, y: -1 } };
+            edgeTiles.push({ x: cell.x, y: cell.y + 1, distance: cell.distance + 1, move: { x: 0, y: -1 } });
+          }
+          if (cell.x > 0 && !getTile(cell.x - 1, cell.y).collision() && scannedTiles[`${cell.x - 1},${cell.y}`] === undefined) {
+            scannedTiles[`${cell.x - 1},${cell.y}`] = { x: cell.x - 1, y: cell.y, distance: cell.distance + 1, move: { x: 1, y: 0 } };
+            edgeTiles.push({ x: cell.x - 1, y: cell.y, distance: cell.distance + 1, move: { x: 1, y: 0 } });
+          }
+          if (cell.x < xCellCount - 1 && !getTile(cell.x + 1, cell.y).collision() && scannedTiles[`${cell.x + 1},${cell.y}`] === undefined) {
+            scannedTiles[`${cell.x + 1},${cell.y}`] = { x: cell.x + 1, y: cell.y, distance: cell.distance + 1, move: { x: -1, y: 0 } };
+            edgeTiles.push({ x: cell.x + 1, y: cell.y, distance: cell.distance + 1, move: { x: -1, y: 0 } });
+          }
+        }
+        const bfsMap = Array.from({ length: yCellCount }, (_, y) => Array.from({ length: xCellCount }, (_, x) => ({ x: 0, y: 0, distance: Infinity })));
+        for (let item of Object.values(scannedTiles)) {
+          bfsMap[item.y][item.x] = { x: item.move.x, y: item.move.y, distance: item.distance };
+        }
+        return bfsMap;
+      }
+
+      function enemyPathfind(enemy, px = player.x, py = player.y) {
+        const possibleMoves = [];
+        if (enemy.y > 0 && !getTile(enemy.x, enemy.y - 1)?.collision() && !checkEnemyCollisions(enemy, 0, -1)) {
+          possibleMoves.push({ x: 0, y: -1 });
+        }
+        if (enemy.y < yCellCount - 1 && !getTile(enemy.x, enemy.y + 1)?.collision() && !checkEnemyCollisions(enemy, 0, 1)) {
+          possibleMoves.push({ x: 0, y: 1 });
+        }
+        if (enemy.x > 0 && !getTile(enemy.x - 1, enemy.y)?.collision() && !checkEnemyCollisions(enemy, -1, 0)) {
+          possibleMoves.push({ x: -1, y: 0 });
+        }
+        if (enemy.x < xCellCount - 1 && !getTile(enemy.x + 1, enemy.y)?.collision() && !checkEnemyCollisions(enemy, 1, 0)) {
+          possibleMoves.push({ x: 1, y: 0 });
+        }
+        if (possibleMoves.length === 0) return;
+        let bestMove = null;
+        const x = enemy.x;
+        const y = enemy.y;
+        let closestDistance = (x - px) * (x - px) + (y - py) * (y - py);
+        for (const move of possibleMoves) {
+          const x = enemy.x + move.x;
+          const y = enemy.y + move.y;
+          const distance = (x - px) * (x - px) + (y - py) * (y - py);
+          if (distance < closestDistance) {
+            bestMove = move;
+            closestDistance = distance;
+          }
+        }
+        if (!bestMove) return;
+        enemy.x += bestMove.x;
+        enemy.y += bestMove.y;
+        return enemy;
+      }
+
+      function hasLineOfSight(s1, s2, endpoints = false) {
+        const dist = Math.sqrt((s1.x - s2.x) * (s1.x - s2.x) + (s1.y - s2.y) * (s1.y - s2.y));
+        if (dist !== 0) {
+          const dX = s1.x - s2.x;
+          const uX = dX / dist;
+          const dY = s1.y - s2.y;
+          const uY = dY / dist;
+          const maxSteps = Math.max(Math.abs(dX), Math.abs(dY));
+
+          let stepX = 0;
+          let stepY = 0;
+          if (uY === 0) {
+            stepY = 0;
+            stepX = uX > 0 ? 1 : -1;
+          } else if (uX === 0) {
+            stepY = uY > 0 ? 1 : -1;
+            stepX = 0;
+          } else {
+            stepX = dX / maxSteps;
+            stepY = dY / maxSteps;
+          }
+
+          let currentX = s2.x;
+          let currentY = s2.y;
+          const xDir = uX > 0 ? 1 : -1;
+          const yDir = uY > 0 ? 1 : -1;
+          for (let i = 0; i < maxSteps; i++) {
+            currentX += stepX;
+            currentY += stepY;
+
+            if (getTile(Math.round(currentX), Math.round(currentY)).collision()) {
+              if (endpoints) {
+                return { hasLineOfSight: false, s1: s1, s2: { x: currentX, y: currentY } };
+              }
+              return false;
+            }
+          }
+        }
+        if (endpoints) {
+          return { hasLineOfSight: true, s1: s1, s2: s2 };
+        }
+        return true;
+      }
+
+      const keys = {};
+
+      window.addEventListener("keydown", (event) => {
+        keys[event.key.toLowerCase()] = true;
+      });
+
+      window.addEventListener("keyup", (event) => {
+        keys[event.key.toLowerCase()] = false;
+      });
+
+      let playerMoved = false;
+      let lastMove = performance.now();
+
+      function explosion(ox, oy, radius) {
+        const affectedTiles = [];
+        const visitedTiles = {};
+        visitedTiles[ox + "," + oy] = true;
+        let edgeTiles = [{ x: ox, y: oy, d: 0 }];
+        while (edgeTiles.length > 0) {
+          const tile = edgeTiles.shift();
+          affectedTiles.push(tile);
+          for (const [dx, dy] of [
+            [1, 0],
+            [-1, 0],
+            [0, 1],
+            [0, -1],
+          ]) {
+            if (visitedTiles[[dx + tile.x] + "," + [dy + tile.y]]) continue;
+            visitedTiles[[dx + tile.x] + "," + [dy + tile.y]] = true;
+            const distx = dx + tile.x - ox;
+            const disty = dy + tile.y - oy;
+            const dist = distx * distx + disty * disty;
+            if (dist < radius * radius) {
+              edgeTiles.push({ x: tile.x + dx, y: tile.y + dy, d: dist });
+            }
+          }
+        }
+
+        let pushedEnemies = {};
+        for (let i = affectedTiles.length - 1; i >= 0; i--) {
+          const tile = affectedTiles[i];
+          const x = tile.x;
+          const y = tile.y;
+          const d = tile.d;
+          const t = getTile(x, y);
+          const dxOrigin = x - ox;
+          const dyOrigin = y - oy;
+          let distFromOrigin = dxOrigin * dxOrigin + dyOrigin * dyOrigin;
+
+          const actualDist = Math.sqrt(distFromOrigin);
+          let ux = dxOrigin / actualDist;
+          let uy = dyOrigin / actualDist;
+          let pushPower = radius + 1 - actualDist;
+          if (distFromOrigin === 0) {
+            const [dxn, dyn] = [
+              [1, 0],
+              [-1, 0],
+              [0, 1],
+              [0, -1],
+            ][random(0, 3)];
+            pushPower = radius + 1;
+            ux = dxn;
+            uy = dyn;
+          }
+          const mx = ux * pushPower;
+          const my = uy * pushPower;
+          const nx = Math.round(x + mx);
+          const ny = Math.round(y + my);
+          if (t?.collision() && t?.isBreakable()) {
+            setTile(nx, ny, new Cell(nx, ny, getTile(x, y).type));
+            setTile(x, y, new Cell(x, y, "grass"));
+          }
+
+          for (let i = enemies.length - 1; i >= 0; i--) {
+            const e = enemies[i];
+            if (e.x !== x || e.y !== y || pushedEnemies[e.x + "," + e.y]) continue;
+            e.x = nx;
+            e.y = ny;
+            pushedEnemies[e.x + "," + e.y] = true;
+            getTile(nx, ny).isBreakable() ? setTile(nx, ny, new Cell(nx, ny, "grass")) : null;
+          }
+        }
+      }
+
+      function handleMovement() {
+        if (performance.now() - lastMove < 100) return;
+        if (!playerMoved) {
+          if (keys.shift && dashCooldown <= 0) {
+            const nx = player.x + facing.x * 2;
+            const ny = player.y + facing.y * 2;
+
+            const doDash = () => {
+              player.x = player.x + facing.x * 2;
+              player.y = player.y + facing.y * 2;
+              dashCooldown = 15;
+            };
+            switch (facing.x + "," + facing.y) {
+              case "0,-1": {
+                if (player.y < yCellCount - 2 && !getTile(nx, ny).collision()) {
+                  doDash();
+                }
+                break;
+              }
+              case "0,1": {
+                if (player.y > 1 && !getTile(nx, ny).collision()) {
+                  doDash();
+                }
+                break;
+              }
+              case "1,0": {
+                if (player.x > 1 && !getTile(nx, ny).collision()) {
+                  doDash();
+                }
+                break;
+              }
+              case "-1,0": {
+                if (player.x < xCellCount - 2 && !getTile(nx, ny).collision()) {
+                  doDash();
+                }
+                break;
+              }
+            }
+          }
+
+          const facingDirs = {
+            arrowdown: { x: 0, y: 1 },
+            arrowup: { x: 0, y: -1 },
+            arrowleft: { x: -1, y: 0 },
+            arrowright: { x: 1, y: 0 },
+          };
+
+          for (const key in facingDirs) {
+            if (keys[key]) facing = facingDirs[key];
+          }
+
+          if (keys.w && player.y > 0 && !playerMoved) {
+            facing = { x: 0, y: -1 };
+            if (!getTile(player.x, player.y - 1)?.collision()) {
+              playerMoved = true;
+              player.y -= 1;
+              lastActualMove = performance.now();
+            }
+            lastMove = performance.now();
+          } else if (keys.s && player.y < yCellCount - 1 && !playerMoved) {
+            if (!getTile(player.x, player.y + 1)?.collision()) {
+              playerMoved = true;
+              player.y += 1;
+              lastActualMove = performance.now();
+            }
+
+            lastMove = performance.now();
+            facing = { x: 0, y: 1 };
+          } else if (keys.a && player.x > 0 && !playerMoved) {
+            if (!getTile(player.x - 1, player.y)?.collision()) {
+              playerMoved = true;
+              player.x -= 1;
+              lastActualMove = performance.now();
+            }
+
+            lastMove = performance.now();
+            facing = { x: -1, y: 0 };
+          } else if (keys.d && player.x < xCellCount - 1 && !playerMoved) {
+            if (!getTile(player.x + 1, player.y)?.collision()) {
+              playerMoved = true;
+              player.x += 1;
+              lastActualMove = performance.now();
+            }
+
+            lastMove = performance.now();
+            facing = { x: 1, y: 0 };
+          }
+          if (keys.mouse) {
+            const cx = Math.round(selectedTile.x + cameraX - cameraWidth / 2);
+            const cy = Math.round(selectedTile.y + cameraY - cameraHeight / 2);
+            explosion(cx, cy, 3);
+            for (let i = 0; i < enemies.length; i++) {
+              playerMoved = true;
+              lastActualMove = performance.now();
+              lastMove = performance.now();
+              const e = enemies[i];
+              if (e.x === cx && e.y === cy) {
+                e.health -= 1;
+
+                if (e.health <= 0) {
+                  enemies.splice(i, 1);
+                }
+                break;
+              }
+            }
+          }
+        }
+        if (keys[" "]) {
+          playerUseItem();
+          lastMove = performance.now();
+        }
+      }
+
+      function playerUseItem() {
+        const spot = { x: player.x + facing.x, y: player.y + facing.y };
+        if (getTile(spot.x, spot.y)?.isBreakable()) {
+          breakBlock(spot.x, spot.y);
+          return;
+        }
+        switch (inventory[selectedItem]?.type) {
+          case "block": {
+            if (getTile(spot.x, spot.y).type === "grass" && !checkEnemyCollisions({ id: null, x: spot.x, y: spot.y })) {
+              placeBlock(spot.x, spot.y);
+            }
+
+            break;
+          }
+
+          case "powerup": {
+            inventory[selectedItem].usePowerup();
+            return;
+          }
+        }
+      }
+
+      function placeBlock(x, y, type) {
+        const item = inventory[selectedItem];
+        if (!item) return;
+        if (inventory.length <= 0 && item.count <= 0 && !item.isPlaceable()) return;
+
+        inventory[selectedItem].count -= 1;
+        if (inventory[selectedItem].count === 0) {
+          inventory.splice(selectedItem, 1);
+          selectedItem = Math.max(0, Math.min(selectedItem, inventory.length - 1));
+        }
+        setTile(x, y, new Cell(x, y, item.blocktype));
+      }
+
+      function breakBlock(x, y) {
+        const type = getTile(x, y).type;
+        setTile(x, y, new Cell(x, y, "grass"));
+        for (let item of inventory) {
+          if (item.type === "block" && item.blocktype === type) {
+            item.count += 1;
+            return;
+          }
+        }
+        inventory.push(new Item("block", 1, getColor("wall"), { blocktype: type }));
+      }
+
+      class Item {
+        constructor(itemType, count, color, info) {
+          this.type = itemType;
+          this.count = count;
+          this.color = color;
+          for (const [key, value] of Object.entries(info)) {
+            this[key] = value;
+          }
+        }
+        isPlaceable() {
+          return this.type === "block";
+        }
+        usePowerup(i = inventory.indexOf(this)) {
+          if (this.type !== "powerup") return;
+          inventory.splice(i, 1);
+          this.powerup.usage();
+          selectedItem = Math.max(0, Math.min(inventory.length - 1, selectedItem));
+        }
+      }
+
+      function render() {
+        rect(0, 0, 100000, 100000);
+        for (let x = 0; x < cameraWidth; x++) {
+          for (let y = 0; y < cameraHeight; y++) {
+            const cx = x + cameraX - cameraWidth / 2;
+            const cy = y + cameraY - cameraHeight / 2;
+            if (cx === player.x && cy === player.y) {
+              const invisColor = Math.min(255, Math.max(0, 255 * (1 - (performance.now() - invisStart) / invisTime)));
+              rect(x * cellSize, y * cellSize, cellSize, cellSize, performance.now() - invisStart > invisTime ? "rgb(0, 0, 0)" : `rgb(${invisColor},${invisColor},${invisColor})`);
+              continue;
+            }
+            const color = hslToRgb(getTile(cx, cy).color);
+            const rgb = `rgb(${color.r},${color.g},${color.b})`;
+            rect(x * cellSize, y * cellSize, cellSize, cellSize, rgb);
+          }
+        }
+        for (const enemy of enemies) {
+          const color = enemy.getColor();
+          const rx = enemy.x - cameraX + cameraWidth / 2;
+          const ry = enemy.y - cameraY + cameraHeight / 2;
+          rect(rx * cellSize, ry * cellSize, cellSize, cellSize, color);
+        }
+        for (const line of structuredClone(lineOfSightLines)) {
+          for (const p of ["start", "end"]) {
+            const obj = line[p];
+            obj.x = Math.round(obj.x - cameraX + cameraWidth / 2);
+            obj.y = Math.round(obj.y - cameraY + cameraHeight / 2);
+          }
+          drawLine(line.start.x * cellSize + cellSize / 2, line.start.y * cellSize + cellSize / 2, line.end.x * cellSize + cellSize / 2, line.end.y * cellSize + cellSize / 2, line.color || "black", 2);
+        }
+        text(String(Math.round(timeSurvived / 10)), 150, 50, ctx, { font: "50px monospace", color: "black" });
+        for (const p of powerups) {
+          const rx = p.x - cameraX + cameraWidth / 2;
+          const ry = p.y - cameraY + cameraHeight / 2;
+          const rgb = hslToRgb(p.color);
+          rect(rx * cellSize, ry * cellSize, cellSize, cellSize, `rgb(${rgb.r},${rgb.g},${rgb.b})`);
+        }
+
+        const mcx = cameraX + cameraWidth * (mouse.x / width - 0.5);
+        const mcy = cameraY + cameraHeight * (mouse.y / height - 0.5);
+        const dx = mcx - player.x;
+        const dy = mcy - player.y;
+        const maxSteps = Math.max(Math.abs(dx), Math.abs(dy)) * 10;
+        let endpoint = { x: mouse.x, y: mouse.y };
+        const stepX = dx / maxSteps;
+        const stepY = dy / maxSteps;
+        for (let i = 0; i < maxSteps; i++) {
+          const cx = player.x + i * stepX;
+          const cy = player.y + i * stepY;
+          if (getTile(Math.floor(cx), Math.floor(cy))?.collision()) {
+            const sx = cx - cameraX + cameraWidth / 2;
+            const sy = cy - cameraY + cameraHeight / 2;
+            endpoint = { x: sx * cellSize, y: sy * cellSize };
+            break;
+          }
+        }
+
+        drawLine(endpoint.x, endpoint.y, (player.x - cameraX + cameraWidth / 2 + 0.5) * cellSize, (player.y - cameraY + cameraHeight / 2 + 0.5) * cellSize, "blue");
+
+        selectedTile = {
+          x: Math.floor(endpoint.x / cellSize),
+          y: Math.floor(endpoint.y / cellSize),
+        };
+        rect(selectedTile.x * cellSize, selectedTile.y * cellSize, cellSize, cellSize, "rgba(0, 0, 0, 0)", "black", 4);
+      }
+
+      let selectedTile = { x: 0, y: 0 };
+
+      function damagePlayer() {
+        for (const enemy of enemies) {
+          if (enemy.checkForAttack()) {
+            player.health -= 1;
+            let foundValidSpot = false;
+            let i = 0;
+            while (!foundValidSpot) {
+              i++;
+              if (i > 100) foundValidSpot = true;
+              player.x = random(1, xCellCount - 2);
+              player.y = random(1, yCellCount - 2);
+              if (!getTile(player.x, player.y)?.collision() && !checkEnemyCollisions(player)) foundValidSpot = true;
+            }
+            break;
+          }
+        }
+      }
+
+      function log(...log) {
+        console.log(log);
+      }
+
+      let lineOfSightLines = [];
+
+      function updateEnemies() {
+        playerMoved = false;
+        lineOfSightLines = [];
+        const bfsMap = fillBfs(map);
+
+        let sampledCells = 0;
+        let successCells = 0;
+        let failCells = 0;
+        for (let i = 0; i < 1000; i++) {
+          if (sampledCells >= 250) i = 1000;
+          const x = random(1, xCellCount - 2);
+          const y = random(1, yCellCount - 2);
+          const m = bfsMap[y][x];
+          if (getTile(x, y).collision()) continue;
+          sampledCells++;
+          if (m.x === 0 && m.y === 0 && player.x !== x && player.y !== y) {
+            failCells += 1;
+            continue;
+          }
+          successCells += 1;
+        }
+
+        const r = failCells / (failCells + successCells);
+        if (r > 0.25) {
+          countTime = false;
+        } else countTime = true;
+
+        for (let enemy of enemies) {
+          const enemyMap = getEnemyMap();
+          //enemy = enemyPathfind(enemy);
+          // Check for line-of-sight
+          const dist = Math.sqrt((player.x - enemy.x) * (player.x - enemy.x) + (player.y - enemy.y) * (player.y - enemy.y));
+          if (dist === 0) continue;
+          const dX = player.x - enemy.x;
+          const uX = dX / dist;
+          const dY = player.y - enemy.y;
+          const uY = dY / dist;
+          const maxSteps = Math.max(Math.abs(dX), Math.abs(dY));
+
+          let stepX = 0;
+          let stepY = 0;
+          if (uY === 0) {
+            stepY = 0;
+            stepX = uX > 0 ? 1 : -1;
+          } else if (uX === 0) {
+            stepY = uY > 0 ? 1 : -1;
+            stepX = 0;
+          } else {
+            stepX = dX / maxSteps;
+            stepY = dY / maxSteps;
+          }
+
+          let currentX = enemy.x;
+          let currentY = enemy.y;
+          const xDir = uX > 0 ? 1 : -1;
+          const yDir = uY > 0 ? 1 : -1;
+          let foundIntersection = false;
+          for (let i = 0; i < maxSteps; i++) {
+            currentX += stepX;
+            currentY += stepY;
+
+            if (getTile(Math.round(currentX), Math.round(currentY)).collision()) {
+              foundIntersection = true;
+              break;
+            }
+          }
+
+          const move = structuredClone(bfsMap[enemy.y][enemy.x]);
+          if (foundIntersection) {
+            move.x = 0;
+            move.y = 0;
+          }
+
+          if (performance.now() - invisStart < invisTime) {
+            move.x = 0;
+            move.y = 0;
+          }
+
+          if (move.x === 0 && move.y === 0) {
+            const possibleMoves = [];
+            for (const [dx, dy] of [
+              [-1, 0],
+              [1, 0],
+              [0, 1],
+              [0, -1],
+            ]) {
+              const nx = enemy.x + dx;
+              const ny = enemy.y + dy;
+              if (!inBounds(nx, ny)) continue;
+              const e = enemyMap[enemy.y + dy][enemy.x + dx];
+              const t = getTile(enemy.x + dx, enemy.y + dy);
+
+              if (!getTile(nx, ny).collision() && !enemyMap[ny][nx]) {
+                possibleMoves.push({ x: dx, y: dy });
+              }
+            }
+            if (possibleMoves.length > 0) {
+              const r = random(0, possibleMoves.length - 1);
+              enemy.x += possibleMoves[r].x;
+              enemy.y += possibleMoves[r].y;
+            }
+            lineOfSightLines.push({ start: { x: enemy.x, y: enemy.y }, end: { x: currentX, y: currentY } });
+
+            continue;
+          }
+          if (!enemyMap[enemy.y + move.y]?.[enemy.x + move.x]) {
+            enemy.x += move.x;
+            enemy.y += move.y;
+            lineOfSightLines.push({ start: { x: enemy.x, y: enemy.y }, end: { x: currentX, y: currentY } });
+
+            continue;
+          }
+          let bestDist = bfsMap[enemy.y][enemy.x].distance;
+          let bestMove = { x: 0, y: 0 };
+          for (const [dx, dy] of [
+            [-1, 0],
+            [1, 0],
+            [0, 1],
+            [0, -1],
+          ]) {
+            if (dx === move.x && dy === move.y) {
+              lineOfSightLines.push({ start: { x: enemy.x, y: enemy.y }, end: { x: currentX, y: currentY } });
+
+              continue;
+            }
+            const nX = enemy.x + dx;
+            const nY = enemy.y + dy;
+            if (nX >= 0 && nY >= 0 && nX <= xCellCount - 1 && nY <= yCellCount - 1 && bestDist > bfsMap[nY][nX].distance && !enemyMap[nY][nX] && !getTile(nX, nY).collision()) {
+              bestDist = bfsMap[nY][nX].distance;
+              bestMove = { x: dx, y: dy };
+            }
+          }
+          enemy.x += bestMove.x;
+          enemy.y += bestMove.y;
+
+          lineOfSightLines.push({ start: { x: enemy.x, y: enemy.y }, end: { x: currentX, y: currentY } });
+        }
+        for (const enemy of enemies) {
+          if (enemy.checkForAttack()) {
+            player.health -= 1;
+            let foundValidSpot = false;
+            let i = 0;
+            while (!foundValidSpot) {
+              i++;
+              if (i > 100) foundValidSpot = true;
+              player.x = random(1, xCellCount - 2);
+              player.y = random(1, yCellCount - 2);
+              if (!getTile(player.x, player.y)?.collision() && !checkEnemyCollisions(player)) foundValidSpot = true;
+            }
+          }
+        }
+      }
+
+      let powerupSpawnDelay = () => {
+        return 5 * 1000 * (random(0, 10) / 10 + 0.5);
+      };
+      let nextPowerupSpawn = performance.now() + powerupSpawnDelay();
+
+      function spawnPowerup(x = null, y = null) {
+        if (x === null || y === null) {
+          for (let i = 0; i < 123; i++) {
+            x = random(1, xCellCount - 2);
+            y = random(1, yCellCount - 2);
+            if (!getTile(x, y).collision()) break;
+          }
+        }
+        const pt = powerupTypes[random(0, powerupTypes.length - 1)];
+        const p = new Item("powerup", 1, pt.color, { powerup: pt, x: x, y: y });
+        powerups.push(p);
+      }
+
+      function handlePowerups() {
+        if (performance.now() > nextPowerupSpawn) {
+          nextPowerupSpawn = performance.now() + powerupSpawnDelay();
+          spawnPowerup();
+        }
+        for (let i = powerups.length - 1; i >= 0; i--) {
+          const p = powerups[i];
+          if (p.x === player.x && p.y === player.y) {
+            inventory.push(p);
+            powerups.splice(i, 1);
+          }
+        }
+      }
+
+      function renderInventory() {
+        const c = document.getElementById("inventory");
+
+        c.width = width;
+        c.height = Math.floor(width / 8);
+        const w = width / 10;
+        const spacing = width / 100;
+        const tw = w + spacing;
+        rect(0, 0, 10000, 100000, "black", "black", 0, c.getContext("2d"));
+
+        for (let i = 0; i < inventory.length; i++) {
+          const rgb = hslToRgb(inventory[i].color);
+          const color = `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+          rect(spacing + tw * i, c.height / 5, w - spacing, (c.height * 3) / 5, color, "black", i === selectedItem ? 20 : 2, c.getContext("2d"));
+          if (i === selectedItem) rect(spacing + tw * i - 20, c.height / 5 - 20, w - spacing + 40, (c.height * 3) / 5 + 40, "rgba(0, 0, 0, 0)", "red", 20, c.getContext("2d"));
+
+          text(inventory[i].count, tw * i + w / 2 + spacing, c.height / 2, c.getContext("2d"), { align: "center", baseline: "middle", font: "80px monospace" });
+        }
+      }
+
+      let lastTimeChecked = performance.now();
+      let lastActualMove = performance.now();
+
+      function loop() {
+        // remove later
+        if (playerMoved) {
+          dashCooldown -= 1;
+          updateEnemies();
+        } else {
+          handleMovement();
+        }
+        //damagePlayer();
+        cameraX = Math.max(cameraWidth / 2, Math.min(xCellCount - cameraWidth / 2, player.x));
+        cameraY = Math.max(cameraHeight / 2, Math.min(yCellCount - cameraHeight / 2, player.y));
+        render();
+        renderInventory();
+        handlePowerups();
+        if (countTime && performance.now() - lastActualMove < 250) {
+          timeSurvived += performance.now() - lastTimeChecked;
+        }
+        lastTimeChecked = performance.now();
+        requestAnimationFrame(loop);
+      }
+
+      let lastScrollTime = performance.now();
+      window.addEventListener("wheel", (event) => {
+        if (performance.now() - lastScrollTime < 100) return;
+        lastScrollTime = performance.now();
+        if (event.deltaY < 0) {
+          selectedItem = Math.max(0, selectedItem - 1);
+        } else if (event.deltaY > 0) {
+          selectedItem = Math.max(0, Math.min(inventory.length - 1, selectedItem + 1));
+        }
+      });
+
+      canvas.addEventListener("mousemove", (event) => {
+        mouse = getScaledMousePos(canvas, event);
+      });
+
+      canvas.addEventListener("mousedown", (event) => {
+        keys.mouse = true;
+      });
+
+      canvas.addEventListener("mouseup", (event) => {
+        keys.mouse = false;
+      });
+
+      requestAnimationFrame(loop);
+    </script>
+  </body>
+</html>
