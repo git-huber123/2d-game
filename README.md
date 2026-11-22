@@ -2,10 +2,11 @@
 
 ## Time spent:
 
-At the moment, ~8.2 hours. I'm including this so it's possible for reviewers to match up my time spent with my commits.
+At the moment, ~12.7 hours. I'm including this so it's possible for reviewers to match up my time spent with my commits.
 
 | Commit          | Time       | Time since last commit  | Notes                                                                  |
 | --------------- | ---------- | ----------------------- | ---------------------------------------------------------------------- |
+| Dashing         | 12.7 hours | 0.6 hours               | I found a YouTube video of someone playing my game, pretty cool.       |
 | New Enemies     | 12.1 hours | 1.0 hours               | 2 new enemies, pretty cool.                                            |
 | Explosions      | 11.1 hours | 0.6 hours               | This'll be incorporated into a weapon or powerup later                 |
 | Enemy Attacking | 10.5 hours | 0.9 hours               | This'll also be turned into a weapon, instead of being point-and-click |
@@ -17,8 +18,7 @@ At the moment, ~8.2 hours. I'm including this so it's possible for reviewers to 
 
 ##### Controls:
 
-WASD to move around, and spacebar to place/break blocks. Arrow keys to change the direction you're facing. That matters because you place
-blocks in the direction you're facing and it also determines which direction you dash in. Press Shift to dash every 15 moves.
+WASD to move around, and spacebar to place/break blocks.
 
 ##### Mechanics:
 
@@ -51,7 +51,6 @@ and run, beaming enemies while you're at it!
 - There's an inventory system
 - Time-based scoring, with common score-farming methods patched
 - Powerups!
-- You can press shift to dash!
 
 ## General info:
 
