@@ -4,7 +4,7 @@
     <title>Cool 2d Game</title>
     <meta name="viewport" />
     <style>
-      #canvas {
+      canvas {
         display: block;
         image-rendering: pixelated;
         max-width: 90vw;
@@ -12,7 +12,7 @@
       }
       body {
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
         justify-content: center;
         align-items: center;
         gap: 10px;
@@ -22,6 +22,7 @@
   <body>
     <canvas id="canvas"></canvas>
     <canvas id="inventory"></canvas>
+    <canvas id="shop" style="display: none"></canvas>
 
     <script>
       const seed = Math.random();
@@ -130,13 +131,14 @@
         return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
       }
 
-      function resize() {
+      function resize(r = false) {
         const maxWidth = window.innerWidth * 0.9; // matches 90vw
         const maxHeight = window.innerHeight * 0.8; // matches 80vh
         const scale = Math.min(maxWidth / canvas.width, maxHeight / canvas.height);
 
         canvas.style.width = Math.floor(canvas.width * scale) + "px";
         canvas.style.height = Math.floor(canvas.height * scale) + "px";
+        if (r) return { w: canvas.style.width, h: canvas.style.height };
       }
 
       function hslToRgb({ h, s, l }) {
@@ -325,6 +327,8 @@
       let facing = { x: 0, y: -1 };
 
       let mouse = { x: 0, y: 0 };
+
+      let currentScreen = "game";
 
       const powerupTypes = [
         {
@@ -935,7 +939,7 @@
           }
           drawLine(line.start.x * cellSize + cellSize / 2, line.start.y * cellSize + cellSize / 2, line.end.x * cellSize + cellSize / 2, line.end.y * cellSize + cellSize / 2, line.color || "black", 2);
         }
-        text(String(Math.round(timeSurvived / 10)), 150, 50, ctx, { font: "50px monospace", color: "black" });
+        text(score, 150, 50, ctx, { font: "50px monospace", color: "black" });
         for (const p of powerups) {
           const rx = p.x - cameraX + cameraWidth / 2;
           const ry = p.y - cameraY + cameraHeight / 2;
@@ -1185,20 +1189,30 @@
       function renderInventory() {
         const c = document.getElementById("inventory");
 
-        c.width = width;
-        c.height = Math.floor(width / 8);
-        const w = width / 10;
-        const spacing = width / 100;
+        const rr = resize(true);
+        console.log(rr);
+        c.height = rr.h.replace("px", "");
+        c.width = Math.floor(rr.w.replace("px", "") / 8);
+
+        function flippedrect(y, x, h, w, c1, c2, n, ctx) {
+          rect(x, y, w, h, c1, c2, n, ctx);
+        }
+        function flippedtext(t, y, x, c, i) {
+          text(t, x, y, c, i);
+        }
+
+        const w = height / 10;
+        const spacing = height / 100;
         const tw = w + spacing;
-        rect(0, 0, 10000, 100000, "black", "black", 0, c.getContext("2d"));
+        flippedrect(0, 0, 10000, 100000, "black", "black", 0, c.getContext("2d"));
 
         for (let i = 0; i < inventory.length; i++) {
           const rgb = hslToRgb(inventory[i].color);
           const color = `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
-          rect(spacing + tw * i, c.height / 5, w - spacing, (c.height * 3) / 5, color, "black", i === selectedItem ? 20 : 2, c.getContext("2d"));
-          if (i === selectedItem) rect(spacing + tw * i - 20, c.height / 5 - 20, w - spacing + 40, (c.height * 3) / 5 + 40, "rgba(0, 0, 0, 0)", "red", 20, c.getContext("2d"));
+          flippedrect(spacing + tw * i, c.width / 5, w - spacing, (c.width * 3) / 5, color, "black", i === selectedItem ? 20 : 2, c.getContext("2d"));
+          if (i === selectedItem) flippedrect(spacing + tw * i - 20, c.width / 5 - 20, w - spacing + 40, (c.width * 3) / 5 + 40, "rgba(0, 0, 0, 0)", "red", 20, c.getContext("2d"));
 
-          text(inventory[i].count, tw * i + w / 2 + spacing, c.height / 2, c.getContext("2d"), { align: "center", baseline: "middle", font: "80px monospace" });
+          flippedtext(inventory[i].count, tw * i + w / 2 + spacing, c.width / 2, c.getContext("2d"), { align: "center", baseline: "middle", font: "80px monospace" });
         }
       }
 
@@ -1206,30 +1220,71 @@
       let lastActualMove = performance.now();
 
       function loop() {
-        // remove later
-        if (playerMoved) {
-          dashCooldown -= 1;
-          updateEnemies();
-        } else {
-          handleMovement();
-        }
-        //damagePlayer();
-        cameraX = Math.max(cameraWidth / 2, Math.min(xCellCount - cameraWidth / 2, player.x));
-        cameraY = Math.max(cameraHeight / 2, Math.min(yCellCount - cameraHeight / 2, player.y));
-        render();
-        renderInventory();
-        handlePowerups();
-        if (countTime && performance.now() - lastActualMove < 250) {
-          timeSurvived += performance.now() - lastTimeChecked;
-        }
-        lastTimeChecked = performance.now();
-        if (player.health > 0) {
+        if (currentScreen === "game") {
+          // remove later
+          if (playerMoved) {
+            dashCooldown -= 1;
+            updateEnemies();
+          } else {
+            handleMovement();
+          }
+          //damagePlayer();
+          cameraX = Math.max(cameraWidth / 2, Math.min(xCellCount - cameraWidth / 2, player.x));
+          cameraY = Math.max(cameraHeight / 2, Math.min(yCellCount - cameraHeight / 2, player.y));
+          render();
+          renderInventory();
+          handlePowerups();
+          if (countTime && performance.now() - lastActualMove < 250) {
+            timeSurvived += performance.now() - lastTimeChecked;
+            score += Math.ceil((performance.now() - lastTimeChecked) / 10);
+          }
+          lastTimeChecked = performance.now();
+          if (enemies.length === 0) {
+            timeSurvived = 0;
+            switchScreen("shop");
+          }
+          if (player.health > 0) {
+            requestAnimationFrame(loop);
+          } else {
+            rect(0, 0, 10000000, 10000000, "black");
+
+            text("Game over! Score: " + Math.round(score), width / 2, height / 2, ctx, { color: "white", font: "100px monospace", baseline: "middle", align: "center" });
+          }
+        } else if (currentScreen === "shop") {
+          renderShop();
           requestAnimationFrame(loop);
-        } else {
-          rect(0, 0, 10000000, 10000000, "black");
-          text("Game over! Score: " + Math.round(timeSurvived / 10), width / 2, height / 2, ctx, { color: "white", font: "100px monospace", baseline: "middle", align: "center" });
         }
       }
+
+      function switchScreen(screen = null) {
+        if (!screen) return;
+        const m = [
+          { screen: "game", divs: "canvas;inventory" },
+          { screen: "shop", divs: "shop" },
+        ];
+        for (const s of m) {
+          if (s.screen === screen) {
+            for (const sid of s.divs.split(";")) {
+              document.getElementById(sid).style.display = "block";
+            }
+          } else {
+            for (const sid of s.divs.split(";")) {
+              document.getElementById(sid).style.display = "none";
+            }
+          }
+        }
+      }
+
+      function renderShop() {
+        const c = document.getElementById("shop");
+        const cx = c.getContext();
+        const texts = [
+          { x: c.width / 10, y: c.height / 10, t: "You have " + score + " to spend." },
+          { x: c.width / 10, y: c.height / 20, t: "You killed all the enemies! Buy upgrades before moving to the next stage." },
+        ];
+      }
+
+      let score = 0;
 
       let lastScrollTime = performance.now();
       window.addEventListener("wheel", (event) => {
