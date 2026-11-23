@@ -231,7 +231,7 @@
             case "ranged":
               this.losTurnsTaken = 0;
               this.hasLineOfSight = false;
-              this.turnsNeeded = 50;
+              this.turnsNeeded = 25;
               break;
             case "bomber": {
               this.range = 3;
@@ -266,7 +266,7 @@
               const los = hasLineOfSight({ x: this.x, y: this.y }, { x: player.x, y: player.y }, true);
               this.hasLineOfSight = los.hasLineOfSight;
 
-              if (this.hasLineOfSight && performance.now() - invisStart < invisTime) {
+              if (this.hasLineOfSight && performance.now() - invisStart > invisTime) {
                 this.losTurnsTaken += 1;
                 lineOfSightLines.push({ start: los.s1, end: los.s2, color: `rgba(255, 0, 0, ${this.losTurnsTaken / this.turnsNeeded})` });
 
@@ -276,7 +276,7 @@
                   return true;
                 } else return false;
               } else {
-                lineOfSightLines.push({ start: los.s1, end: los.s2, color: `rgba(255, 0, 0, ${this.losTurnsTaken / this.turnsNeeded})` });
+                //lineOfSightLines.push({ start: los.s1, end: los.s2, color: `rgba(255, 0, 0, ${this.losTurnsTaken / this.turnsNeeded})` });
                 this.losTurnsTaken = 0;
                 this.hasLineOfSight = false;
                 return false;
@@ -386,10 +386,22 @@
             invisStart = performance.now();
           },
         },
+        {
+          name: "rocket",
+          description: "gives you 5 rockets that you can fire to make an explosion wherever you click",
+          color: { h: 0, s: 90, l: 66 },
+          usage: () => {
+            rocketCount = 5;
+            selectedCellOutlineColor = "rgb(255, 0, 0)";
+          },
+        },
       ];
 
       let invisStart = -10000;
       let invisTime = 10 * 1000;
+
+      let rocketCount = 0;
+      let selectedCellOutlineColor = "rgb(0, 0, 0)";
 
       const canvas = document.getElementById("canvas");
       window.addEventListener("resize", resize);
@@ -632,7 +644,7 @@
       let playerMoved = false;
       let lastMove = performance.now();
 
-      function explosion(ox, oy, radius) {
+      function explosion(ox, oy, radius, damageEnemies = false) {
         const affectedTiles = [];
         const visitedTiles = {};
         visitedTiles[ox + "," + oy] = true;
@@ -698,6 +710,8 @@
             e.x = nx;
             e.y = ny;
             pushedEnemies[e.x + "," + e.y] = true;
+            if (damageEnemies) e.health -= 1;
+            if (e.health <= 0) enemies.splice(i, 1);
             getTile(nx, ny).isBreakable() ? setTile(nx, ny, new Cell(nx, ny, "grass")) : null;
           }
         }
@@ -793,8 +807,16 @@
           if (keys.mouse) {
             const cx = Math.round(selectedTile.x + cameraX - cameraWidth / 2);
             const cy = Math.round(selectedTile.y + cameraY - cameraHeight / 2);
-            explosion(cx, cy, 3);
-            for (let i = 0; i < enemies.length; i++) {
+            if (rocketCount > 0) {
+              rocketCount -= 1;
+              explosion(cx, cy, 5, true);
+              playerMoved = true;
+              if (rocketCount <= 0) {
+                selectedCellOutlineColor = "rgb(0, 0, 0)";
+              }
+            }
+            for (let i = 0; i > enemies.length; i++) {
+              // doesn't run, switch > to <
               playerMoved = true;
               lastActualMove = performance.now();
               lastMove = performance.now();
@@ -860,7 +882,7 @@
             return;
           }
         }
-        inventory.push(new Item("block", 1, getColor("wall"), { blocktype: type }));
+        inventory.push(new Item("block", 1, getColor(type), { blocktype: type }));
       }
 
       class Item {
@@ -1201,7 +1223,12 @@
           timeSurvived += performance.now() - lastTimeChecked;
         }
         lastTimeChecked = performance.now();
-        requestAnimationFrame(loop);
+        if (player.health > 0) {
+          requestAnimationFrame(loop);
+        } else {
+          rect(0, 0, 10000000, 10000000, "black");
+          text("Game over! Score: " + Math.round(timeSurvived / 10), width / 2, height / 2, ctx, { color: "white", font: "100px monospace", baseline: "middle", align: "center" });
+        }
       }
 
       let lastScrollTime = performance.now();
