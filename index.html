@@ -16,9 +16,48 @@
         justify-content: center;
         align-items: center;
         gap: 10px;
+        position: relative;
       }
       .hidden {
         display: none;
+      }
+      .store-card {
+        width: 80vw;
+        max-height: 20vh;
+        min-height: 10vh;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        background-color: blue;
+        margin: 1vw;
+      }
+      .store-card > * {
+        margin-right: 2vw;
+        margin-left: 2vw;
+        margin-top: 2vh;
+        margin-bottom: 2vh;
+        background-color: rgb(0, 187, 255);
+        border-radius: 10px;
+        text-align: center;
+      }
+      .store-card::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.1); /* Example overlay */
+        pointer-events: none;
+      }
+      button {
+        transition: 0.5s all;
+      }
+      button:hover {
+        scale: 1.1;
+        background-color: color-mix(in srgb, rgb(0, 187, 255), black 30%);
+      }
+      #buy {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
       }
     </style>
   </head>
@@ -432,10 +471,10 @@
           cost: [1000, 1500, 2250, 3500],
           effectArr: [
             { spawnRate: 1, health: 1, score: 1 },
-            { spawnRate: 1.1, health: 1.15, score: 1.2 },
-            { spawnRate: 1.25, health: 1.25, score: 1.4 },
-            { spawnRate: 1.4, health: 1.45, score: 1.7 },
-            { spawnRate: 1.6, health: 1.75, score: 2 },
+            { spawnRate: 0.9, health: 1.15, score: 1.2 },
+            { spawnRate: 0.75, health: 1.25, score: 1.4 },
+            { spawnRate: 0.6, health: 1.45, score: 1.7 },
+            { spawnRate: 0.4, health: 1.75, score: 2 },
           ],
           effect() {
             return this.effectArr[this.level];
@@ -558,6 +597,10 @@
 
       let cameraX = 50;
       let cameraY = 50;
+
+      const defaultEnemySpawnRate = 30;
+
+      switchScreen("shop");
 
       const powerups = [];
 
@@ -1470,7 +1513,7 @@
       }
 
       function getNextEnemySpawnTime() {
-        const base = difficulty.spawnRate;
+        const base = difficulty.spawnRate * defaultEnemySpawnRate;
         const variation = 0.75 + random(0, 10) / 20;
         const mult = base * variation;
         const t = mult * 1000;

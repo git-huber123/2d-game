@@ -2,11 +2,12 @@
 
 ## Time spent:
 
-At the moment, ~15.7 hours. I'm including this so it's possible for reviewers to match up my time spent with my commits.
+At the moment, ~16.8 hours. I'm including this so it's possible for reviewers to match up my time spent with my commits.
 
 | Commit          | Time       | Time since last commit  | Notes                                                                  |
 | --------------- | ---------- | ----------------------- | ---------------------------------------------------------------------- |
-| Shop p2         | 15.7 hours | 0.5 hours               | Unfinished, syncing to my laptop. Also updating outdated README        |
+| Shop Styling p1 | 16.8 hours | 0.7 hours               | Styled the shop, as well as working on a few other things.             |
+| Shop p2         | 16.1 hours | 0.9 hours               | Unfinished, syncing to my laptop. Also updating outdated README        |
 | Shop p1         | 15.2 hours | 1.5 hours               | This isn't finished, but I don't want one giant commit.                |
 | Eyes            | 13.7 hours | 1.0 hours               | Gave the player eyes, also have an unfinished shop screen              |
 | Dashing         | 12.7 hours | 0.6 hours               | I found a YouTube video of someone playing my game, pretty cool.       |
