@@ -2,10 +2,11 @@
 
 ## Time spent:
 
-At the moment, ~12.7 hours. I'm including this so it's possible for reviewers to match up my time spent with my commits.
+At the moment, ~15.7 hours. I'm including this so it's possible for reviewers to match up my time spent with my commits.
 
 | Commit          | Time       | Time since last commit  | Notes                                                                  |
 | --------------- | ---------- | ----------------------- | ---------------------------------------------------------------------- |
+| Shop p2         | 15.7 hours | 0.5 hours               | Unfinished, syncing to my laptop. Also updating outdated README        |
 | Shop p1         | 15.2 hours | 1.5 hours               | This isn't finished, but I don't want one giant commit.                |
 | Eyes            | 13.7 hours | 1.0 hours               | Gave the player eyes, also have an unfinished shop screen              |
 | Dashing         | 12.7 hours | 0.6 hours               | I found a YouTube video of someone playing my game, pretty cool.       |
@@ -20,21 +21,20 @@ At the moment, ~12.7 hours. I'm including this so it's possible for reviewers to
 
 ##### Controls:
 
-WASD to move around, and spacebar to place/break blocks.
+WASD to move around, and spacebar to place/break blocks, and to use powerups. Arrow keys to look around without moving, click to fire a rocket from the rocket powerup.
 
 ##### Mechanics:
 
 Enemies will find the best path towards you if they can see you, but if they can't see you, they'll move randomly. For each 1 move that you make,
 the enemies will also move once. Their line-of-sight lines are drawn on screen.
 
-Your score is based on how many milliseconds you survive, 100 points for 1 second. If you stop moving for too long, or try to camp in a box, then
+Your score is based on how many milliseconds you survive, 10 points for 1 second. If you stop moving for too long, or try to camp in a box, then
 time doesn't count, and it's pretty accurate.
 
 You can get powerups! See the powerups section for more info.
 
-You can also attack enemies - your mouse position is highlighted via a blue line and a box is drawn on the selected cell. If you click,
-you can attack an enemy, but the enemies will also take a turn and move, even if you miss. It's kinda fun to just hold down the mouse
-and run, beaming enemies while you're at it!
+You can also attack enemies with the rocket powerup, which gives you 5 point-and-click rockets. Wherever you're aiming is highlighted in black and has a blue line drawn
+to it with the player, and when you use a rocket, it just creates an explosion at the selected block.
 
 ## Links:
 
@@ -92,6 +92,10 @@ Makes the enemies just wander randomly for the next 10 seconds, they can't see y
 
 Checks a bunch of spots, and teleports you to the one with the furthest distance from any enemies.
 
+##### Rocket:
+
+Gives you 5 rockets, they explode at your selected tile, can damage enemies.
+
 ## Known bugs:
 
 - None at the moment!
@@ -103,8 +107,9 @@ Checks a bunch of spots, and teleports you to the one with the furthest distance
 ## Planned:
 
 - Visual indication for your health
-- Player being able to attack the enemies
-- Crafting!
+- Finishing shop system
+- Bossfight at the end
+- Polishing and QoL things like instructions and controls page, screen shake, audio, etc
 
 ## AI Usage Disclamer:
 

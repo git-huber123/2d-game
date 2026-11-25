@@ -252,7 +252,7 @@
             }
           }
 
-          if (health === null) health = { normal: 5, ranged: 3, bomber: 1 }[type];
+          if (health === null) health = { normal: 5, ranged: 3, bomber: 1 }[type] * difficulty.health;
           if (health === undefined) return;
 
           this.id = crypto.randomUUID();
@@ -354,6 +354,46 @@
         }
       }
 
+      function nextLevel() {
+        level += 1;
+        nextEnemySpawn = getNextEnemySpawnTime();
+        lastScrollTime = performance.now();
+        lastTimeChecked = performance.now();
+        lastActualMove = performance.now();
+        lineOfSightLines = [];
+        nextPowerupSpawn = powerupSpawnDelay() + performance.now();
+        selectedTile = { x: 0, y: 0 };
+        lastRocketUse = 0;
+        playerMoved = false;
+        lastMove = 0;
+        enemies.length = 0;
+        fillRect(0, 0, xCellCount - 1, yCellCount - 1, "grass");
+        fillRect(0, 0, 1, yCellCount - 1, "barrier");
+        fillRect(xCellCount - 1, 0, xCellCount - 1, yCellCount - 1, "barrier");
+        fillRect(0, 0, xCellCount - 1, 0, "barrier");
+        fillRect(0, yCellCount - 1, xCellCount - 1, yCellCount - 1, "barrier");
+        fillRect(1, 1, xCellCount - 2, yCellCount - 2, "grass");
+
+        const initialBoulderCount = random(50, 75);
+        for (let i = 0; i < initialBoulderCount; i++) {
+          const width = random(1, 2);
+          const sx = random(1, xCellCount - 2 - width);
+          const sy = random(1, yCellCount - 2 - width);
+          fillRect(sx, sy, sx + width, sy + width, "wall");
+        }
+
+        player.x = 50;
+        player.y = 50;
+        player.health = baseHealth;
+        countTime = true;
+        timeSurvived = 0;
+        cameraX = 50;
+        cameraY = 50;
+        rocketCount = 0;
+        invisStart = -100000;
+      }
+
+      let level = 1;
       let inventory = [];
       let selectedItem = 0;
 
@@ -414,13 +454,14 @@
       };
       let scorePerXMs = 100; // 1 score point per 100 ms
       let score = 0;
-      const baseHealth = 5;
+      let baseHealth = upgrades.health.effect();
 
       let currentPowerupWaitTime = upgrades.powerup.effect();
       let luck = upgrades.luck.effect();
+      let difficulty = upgrades.difficulty.effect();
 
       function startNextLevel() {
-        player.health = upgrades.health.effect();
+        player.health = baseHealth;
       }
 
       const powerupTypes = [
@@ -1364,6 +1405,10 @@
           } else {
             handleMovement();
           }
+          if (performance.now() > nextEnemySpawn) {
+            nextEnemySpawn = getNextEnemySpawnTime();
+            enemies.push(new Enemy());
+          }
           //damagePlayer();
           cameraX = Math.max(cameraWidth / 2, Math.min(xCellCount - cameraWidth / 2, player.x));
           cameraY = Math.max(cameraHeight / 2, Math.min(yCellCount - cameraHeight / 2, player.y));
@@ -1371,7 +1416,7 @@
           renderInventory();
           handlePowerups();
           if (countTime && performance.now() - lastActualMove < 250) {
-            timeSurvived += performance.now() - lastTimeChecked;
+            timeSurvived += (performance.now() - lastTimeChecked) * difficulty.score;
           }
           lastTimeChecked = performance.now();
           if (enemies.length === 0) {
@@ -1425,12 +1470,14 @@
       }
 
       function getNextEnemySpawnTime() {
-        const base = upgrades.difficulty.effect().spawnRate;
+        const base = difficulty.spawnRate;
         const variation = 0.75 + random(0, 10) / 20;
         const mult = base * variation;
         const t = mult * 1000;
         return performance.now() + t;
       }
+
+      let nextEnemySpawn = getNextEnemySpawnTime();
 
       let lastScrollTime = performance.now();
       window.addEventListener("wheel", (event) => {
