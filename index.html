@@ -17,12 +17,45 @@
         align-items: center;
         gap: 10px;
       }
+      .hidden {
+        display: none;
+      }
     </style>
   </head>
   <body>
     <canvas id="canvas"></canvas>
     <canvas id="inventory"></canvas>
-    <canvas id="shop" style="display: none"></canvas>
+    <div id="shop" class="hidden">
+      <p id="roundwinmessage">You beat level 1, now spend your score points in the shop!</p>
+      <p id="scoredisplay"></p>
+      <div id="buy">
+        <div class="store-card">
+          <button id="powerup" onclick="buyUpgrade('powerup')">More Powerups!</button>
+          <p id="powerupDesc">Makes powerups spawn more often</p>
+          <p id="powerupCost">Needs 500 score points!</p>
+          <p id="powerupStats">Not Owned</p>
+        </div>
+        <div class="store-card">
+          <button id="health" onclick="buyUpgrade('health')">More health!</button>
+          <p id="healthDesc">Gives you more health (obv)</p>
+          <p id="healthCost">Needs 300 score points!</p>
+          <p id="healthStats">Not Owned</p>
+        </div>
+        <div class="store-card">
+          <button id="difficulty" onclick="buyUpgrade('difficulty')">Difficulty increase!</button>
+          <p id="difficultyDesc">Spawns more enemies with more health, but also get way more score points!</p>
+          <p id="difficultyCost">Needs 1000 score points!</p>
+          <p id="difficultyStats">Not Owned</p>
+        </div>
+        <div class="store-card">
+          <button id="luck" onclick="buyUpgrade('luck')">Luck increase!</button>
+          <p id="luckDesc">Gives you a chance to pick up double or triple items (e.g. 2 blocks from one, or 3 powerups from one)!</p>
+          <p id="luckCost">Needs 2000 score points!</p>
+          <p id="luckStats">Not Owned</p>
+        </div>
+      </div>
+      <button onclick="nextLevel()">Next level!</button>
+    </div>
 
     <script>
       const seed = Math.random();
@@ -330,6 +363,66 @@
 
       let currentScreen = "game";
 
+      // upgrades
+      let upgrades = {
+        powerup: {
+          name: "powerup",
+          level: 0,
+          cost: [600, 800, 1400],
+          max: 3,
+          effectArr: [10, 8.5, 6, 3.5],
+          effect() {
+            return this.effectArr[this.level];
+          },
+        },
+        health: {
+          name: "health",
+          level: 0,
+          cost: [800, 1200, 1800, 2500, 4000],
+          max: 5,
+          effectArr: [1, 1.15, 1.5, 2, 2.65, 3.5],
+          effect() {
+            return this.effectArr[this.level];
+          },
+        },
+        difficulty: {
+          name: "difficulty",
+          level: 0,
+          max: 4,
+          cost: [1000, 1500, 2250, 3500],
+          effectArr: [
+            { spawnRate: 1, health: 1, score: 1 },
+            { spawnRate: 1.1, health: 1.15, score: 1.2 },
+            { spawnRate: 1.25, health: 1.25, score: 1.4 },
+            { spawnRate: 1.4, health: 1.45, score: 1.7 },
+            { spawnRate: 1.6, health: 1.75, score: 2 },
+          ],
+          effect() {
+            return this.effectArr[this.level];
+          },
+        },
+        luck: {
+          name: "luck",
+          level: 0,
+          max: 5,
+          cost: [1500, 1800, 2500, 3000, 4500],
+          effectArr: [0, 0.05, 0.1, 0.2, 0.25, 0.4],
+          effect() {
+            return this.effectArr[this.level];
+          },
+        },
+      };
+      let scorePerXMs = 100; // 1 score point per 100 ms
+      let score = 0;
+      const baseHealth = 5;
+
+      let currentPowerupWaitTime = upgrades.powerup.effect();
+      let luck = upgrades.luck.effect();
+
+      function startNextLevel() {
+        player.health = upgrades.health.effect();
+      }
+
       const powerupTypes = [
         {
           name: "teleport",
@@ -430,7 +523,7 @@
       let timeSurvived = 0;
       let countTime = true;
 
-      const player = { x: 50, y: 50, health: 10 };
+      const player = { x: 50, y: 50, health: baseHealth };
       const cameraWidth = width / cellSize;
       const cameraHeight = height / cellSize;
 
@@ -498,7 +591,7 @@
       setTile(player.x, player.y, new Cell(player.x, player.y, "grass"));
 
       const enemies = [];
-      const initialEnemyCount = random(10, 18);
+      const initialEnemyCount = random(5, 12);
       for (let i = 0; i < initialEnemyCount; i++) {
         new Enemy();
       }
@@ -716,7 +809,7 @@
             pushedEnemies[e.x + "," + e.y] = true;
             if (damageEnemies) e.health -= 1;
             if (e.health <= 0) enemies.splice(i, 1);
-            getTile(nx, ny).isBreakable() ? setTile(nx, ny, new Cell(nx, ny, "grass")) : null;
+            getTile(nx, ny)?.isBreakable() ? setTile(nx, ny, new Cell(nx, ny, "grass")) : null;
           }
         }
       }
@@ -808,10 +901,12 @@
             lastMove = performance.now();
             facing = { x: 1, y: 0 };
           }
-          if (keys.mouse) {
+          if (keys.mouse && performance.now() - lastRocketUse > 250) {
             const cx = Math.round(selectedTile.x + cameraX - cameraWidth / 2);
             const cy = Math.round(selectedTile.y + cameraY - cameraHeight / 2);
+
             if (rocketCount > 0) {
+              lastRocketUse = performance.now();
               rocketCount -= 1;
               explosion(cx, cy, 5, true);
               playerMoved = true;
@@ -841,6 +936,8 @@
           lastMove = performance.now();
         }
       }
+
+      let lastRocketUse = 0;
 
       function playerUseItem() {
         const spot = { x: player.x + facing.x, y: player.y + facing.y };
@@ -940,7 +1037,7 @@
           }
           drawLine(line.start.x * cellSize + cellSize / 2, line.start.y * cellSize + cellSize / 2, line.end.x * cellSize + cellSize / 2, line.end.y * cellSize + cellSize / 2, line.color || "black", 2);
         }
-        text(score, 150, 50, ctx, { font: "50px monospace", color: "black" });
+        text(getScore(), 150, 50, ctx, { font: "50px monospace", color: "black" });
         for (const p of powerups) {
           const rx = p.x - cameraX + cameraWidth / 2;
           const ry = p.y - cameraY + cameraHeight / 2;
@@ -1194,7 +1291,7 @@
       }
 
       let powerupSpawnDelay = () => {
-        return 5 * 1000 * (random(0, 10) / 10 + 0.5);
+        return currentPowerupWaitTime * 1000 * (random(0, 10) / 10 + 0.5);
       };
       let nextPowerupSpawn = performance.now() + powerupSpawnDelay();
 
@@ -1219,6 +1316,7 @@
         for (let i = powerups.length - 1; i >= 0; i--) {
           const p = powerups[i];
           if (p.x === player.x && p.y === player.y) {
+            p.count = r(0, 1) < luck ? (r(0, 1) < luck ? 3 : 2) : 1;
             inventory.push(p);
             powerups.splice(i, 1);
           }
@@ -1228,8 +1326,7 @@
       function renderInventory() {
         const c = document.getElementById("inventory");
 
-        const rr = resize(true);
-        console.log(rr);
+        const rr = { h: canvas.style.height, w: canvas.style.width };
         c.height = rr.h.replace("px", "");
         c.width = Math.floor(rr.w.replace("px", "") / 8);
 
@@ -1275,10 +1372,10 @@
           handlePowerups();
           if (countTime && performance.now() - lastActualMove < 250) {
             timeSurvived += performance.now() - lastTimeChecked;
-            score += Math.ceil((performance.now() - lastTimeChecked) / 10);
           }
           lastTimeChecked = performance.now();
           if (enemies.length === 0) {
+            score += getScore();
             timeSurvived = 0;
             switchScreen("shop");
           }
@@ -1287,7 +1384,7 @@
           } else {
             rect(0, 0, 10000000, 10000000, "black");
 
-            text("Game over! Score: " + Math.round(score), width / 2, height / 2, ctx, { color: "white", font: "100px monospace", baseline: "middle", align: "center" });
+            text("Game over! Score: " + Math.round(getScore()), width / 2, height / 2, ctx, { color: "white", font: "100px monospace", baseline: "middle", align: "center" });
           }
         } else if (currentScreen === "shop") {
           renderShop();
@@ -1295,7 +1392,12 @@
         }
       }
 
+      function getScore() {
+        return Math.ceil(timeSurvived / scorePerXMs);
+      }
+
       function switchScreen(screen = null) {
+        currentScreen = screen;
         if (!screen) return;
         const m = [
           { screen: "game", divs: "canvas;inventory" },
@@ -1304,11 +1406,11 @@
         for (const s of m) {
           if (s.screen === screen) {
             for (const sid of s.divs.split(";")) {
-              document.getElementById(sid).style.display = "block";
+              document.getElementById(sid).classList.remove("hidden");
             }
           } else {
             for (const sid of s.divs.split(";")) {
-              document.getElementById(sid).style.display = "none";
+              document.getElementById(sid).classList.add("hidden");
             }
           }
         }
@@ -1316,14 +1418,19 @@
 
       function renderShop() {
         const c = document.getElementById("shop");
-        const cx = c.getContext();
         const texts = [
           { x: c.width / 10, y: c.height / 10, t: "You have " + score + " to spend." },
           { x: c.width / 10, y: c.height / 20, t: "You killed all the enemies! Buy upgrades before moving to the next stage." },
         ];
       }
 
-      let score = 0;
+      function getNextEnemySpawnTime() {
+        const base = upgrades.difficulty.effect().spawnRate;
+        const variation = 0.75 + random(0, 10) / 20;
+        const mult = base * variation;
+        const t = mult * 1000;
+        return performance.now() + t;
+      }
 
       let lastScrollTime = performance.now();
       window.addEventListener("wheel", (event) => {
