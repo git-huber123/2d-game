@@ -6,6 +6,7 @@ At the moment, ~12.7 hours. I'm including this so it's possible for reviewers to
 
 | Commit          | Time       | Time since last commit  | Notes                                                                  |
 | --------------- | ---------- | ----------------------- | ---------------------------------------------------------------------- |
+| Shop p1         | 15.2 hours | 1.5 hours               | This isn't finished, but I don't want one giant commit.                |
 | Eyes            | 13.7 hours | 1.0 hours               | Gave the player eyes, also have an unfinished shop screen              |
 | Dashing         | 12.7 hours | 0.6 hours               | I found a YouTube video of someone playing my game, pretty cool.       |
 | New Enemies     | 12.1 hours | 1.0 hours               | 2 new enemies, pretty cool.                                            |
